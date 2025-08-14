@@ -1,0 +1,169 @@
+import asyncio
+import json
+from contextlib import asynccontextmanager
+from typing import Any, Dict, Optional
+
+from aio_pika import  Connection, Exchange, Message, connect_robust, ExchangeType
+from aio_pika.pool import Pool
+
+
+class RabbitMQBroker:
+    def __init__(
+        self,
+        uri: str,
+        max_connections: int = 10,
+        max_channels: int = 100,
+        connection_name: str = "my_app",
+        heartbeat: int = 60,
+    ):
+        self._uri = uri
+        self._connection_name = connection_name
+        self._heartbeat = heartbeat
+        
+        self._conn_pool = Pool(
+            self._make_connection,
+            max_size=max_connections,
+        )
+        
+        self._chan_pool = Pool(
+            self._make_channel,
+            max_size=max_channels,
+        )
+        self._max_channels = max_channels
+        self._exchanges: Dict[str, Exchange] = {}
+        
+    async def _make_connection(self):
+        for attempt in range(3):
+            try:
+                return await connect_robust(
+                    self._uri,
+                    timeout=10,
+                    heartbeat=self._heartbeat,
+                    client_properties={"connection_name": self._connection_name},
+                )
+            except Exception as e:
+                if attempt == 2:  
+                    raise
+                await asyncio.sleep(1)
+        
+    async def _make_channel(self, connection: Connection):
+        channel = await connection.channel(publisher_confirms=True)
+        if channel.is_closed:
+            await channel.reopen()
+        return channel
+    @asynccontextmanager
+    async def channel(self):
+        async with self._conn_pool.acquire() as conn:
+            chan_pool = Pool(lambda: self._make_channel(conn), max_size=self._max_channels)
+            async with chan_pool.acquire() as chan:
+                yield chan
+            await chan_pool.close() 
+
+    async def declare_queue(
+        self, 
+        queue_name: str, 
+        durable: bool = True,
+        exclusive: bool = False,
+        auto_delete: bool = False,
+        arguments: Optional[Dict[str, Any]] = None
+    ):
+        async with self.channel() as chan:
+            queue = await chan.declare_queue(
+                queue_name,
+                durable=durable,
+                exclusive=exclusive,
+                auto_delete=auto_delete,
+                arguments=arguments or {},
+            )
+            return queue
+        
+    async def bind_queue(self, queue_name: str, exchange_name: str, routing_key: str):
+        async with self.channel() as chan:
+            queue = await chan.declare_queue(queue_name, passive=True)
+            await queue.bind(exchange_name, routing_key)
+    
+    async def is_queue_declared(self, queue_name: str):
+        async with self.channel() as chan:
+            queue = await chan.declare_queue(queue_name, passive=True)
+            return queue
+    
+    async def declare_exchange(
+        self, 
+        exchange_name: str, 
+        exchange_type: ExchangeType = ExchangeType.DIRECT,
+        durable: bool = True,
+        auto_delete: bool = False,
+        arguments: Optional[Dict[str, Any]] = None
+    ):
+        async with self.channel() as chan:
+            exchange = await chan.declare_exchange(
+                exchange_name,
+                type=exchange_type,
+                durable=durable,
+                auto_delete=auto_delete,
+                arguments=arguments or {},
+            )
+            
+            self._exchanges[exchange_name] = exchange
+            return exchange
+
+
+
+    async def publish(
+        self,
+        data: Any,
+        routing_key: str,
+        exchange_name: str = "",
+        exchange_type: ExchangeType = ExchangeType.DIRECT,
+        persistent: bool = True,
+        priority: Optional[int] = None,
+        expiration: Optional[int] = None,
+        headers: Optional[Dict[str, Any]] = None,
+    ):
+
+        if isinstance(data, bytes):
+            payload = data
+            content_type = "application/octet-stream"
+        else:
+            payload = json.dumps(data).encode('utf-8')
+            content_type = "application/json"
+        
+        message_properties = {
+            "content_type": content_type,
+            "delivery_mode": 2 if persistent else 1,
+            "headers": headers or {},
+        }
+        
+        if priority is not None:
+            message_properties["priority"] = min(max(0, priority), 9)  
+        
+        if expiration is not None:
+            message_properties["expiration"] = str(expiration * 1000) 
+        
+        msg = Message(payload, **message_properties)
+        
+        async with self.channel() as chan:
+            exchange: Exchange
+            if not exchange_name:
+                exchange = chan.default_exchange
+            elif exchange_name in self._exchanges:
+                exchange = self._exchanges[exchange_name]
+            else:
+                exchange = await chan.declare_exchange(
+                    exchange_name,
+                    type=exchange_type,
+                    durable=True,
+                )
+                self._exchanges[exchange_name] = exchange
+                
+            await exchange.publish(msg, routing_key=routing_key)
+            
+    async def purge_queue(self, queue_name: str):
+        async with self.channel() as chan:
+            queue = await chan.declare_queue(queue_name, passive=True)
+            await queue.purge()
+            
+    async def close(self):
+        self._exchanges.clear()
+        await self._chan_pool.close()
+        await self._conn_pool.close()

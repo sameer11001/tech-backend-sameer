@@ -1,0 +1,107 @@
+services:
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: fastapi_app
+    ports:
+      - "8000:8000"
+    depends_on:
+      - postgres
+      - mongo
+      - redis
+      - rabbitmq
+    environment:
+      - DATABASE_URL=${POSTGRES_DATABASE_URL}
+      - MONGO_URI=mongodb://mongo_user:mongo_password@mongo:27017/db_name?authSource=admin
+      - REDIS_URL=${CACHE_URL}
+    volumes:
+      - .:/app
+    networks:
+      - app-network
+
+  celery_worker:
+    build:
+      context: .
+      dockerfile: celery.Dockerfile
+    container_name: celery_worker
+    working_dir: /worker
+    command: >
+      celery -A my_celery.celery_app worker
+        --uid=1
+        --gid=1
+        --loglevel=DEBUG
+        --autoscale=10,2
+
+    volumes:
+      - .:/worker
+    depends_on:
+      - rabbitmq
+      - redis
+    networks:
+      - app-network
+
+  postgres:
+    image: postgres:17.5-alpine
+    container_name: postgres
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      POSTGRES_DB: ${POSTGRES_DB}
+    ports:
+      - "5432:5432"
+    networks:
+      - app-network
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+
+  mongo:
+    image: mongo:8.0.3-noble
+    container_name: mongo
+    ports:
+      - "27017:27017"
+    environment:
+      MONGO_INITDB_ROOT_USERNAME: mongo_user
+      MONGO_INITDB_ROOT_PASSWORD: mongo_password
+    command: mongod --wiredTigerCacheSizeGB 1 --logpath /var/log/mongodb/mongod.log --logappend --setParameter logLevel=1
+    networks:
+      - app-network
+    volumes:
+      - mongo_data:/data/db
+
+  redis:
+    image: redis:7-alpine
+    container_name: redis-cache
+    ports:
+      - "6379:6379"
+    networks:
+      - app-network
+    volumes:
+      - redis_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 30s
+      retries: 3
+
+  rabbitmq:
+    image: rabbitmq:4.1.0-management-alpine
+    container_name: rabbitmq
+    environment:
+      RABBITMQ_DEFAULT_USER: ${RABBITMQ_DEFAULT_USER}
+      RABBITMQ_DEFAULT_PASS: ${RABBITMQ_DEFAULT_PASS}
+      RABBITMQ_DEFAULT_VHOST: ${RABBITMQ_VHOST}
+    ports:
+      - "5672:5672"
+      - "15672:15672"
+    networks:
+      - app-network
+
+networks:
+  app-network:
+
+volumes:
+  postgres_data:
+  mongo_data:
+  redis_data:
+  redis_broker_data:
