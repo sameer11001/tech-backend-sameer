@@ -1,3 +1,4 @@
+
 from app.core.exceptions.custom_exceptions.EntityNotFoundException import EntityNotFoundException
 from app.core.repository.MongoRepository import MongoCRUD
 from app.core.schemas.BaseResponse import ApiResponse
@@ -29,6 +30,7 @@ class DeleteTemplate:
         self.business_profile_service = business_profile_service
         self.template_service = template_service
         self.mongo_crud = mongo_crud
+
         
     async def execute(self, user_id: str, name: str, template_id: str = None):
 

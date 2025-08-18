@@ -4,11 +4,12 @@ from app.core.exceptions.GlobalException import GlobalException
 from app.core.exceptions.custom_exceptions.DataBaseException import DataBaseException
 from app.user_management.user.models.User import User
 from app.core.repository.BaseRepository import BaseRepository
-from sqlmodel import Session, select
+from sqlmodel import  select
 from sqlalchemy.exc import SQLAlchemyError
+from sqlmodel.ext.asyncio.session import AsyncSession
 
 class UserRepository(BaseRepository[User]):
-    def __init__(self, session: Session):
+    def __init__(self, session: AsyncSession):
         super().__init__(model=User, session=session)
 
     async def get_by_email(self, email: str) -> Optional[User]:
@@ -19,6 +20,7 @@ class UserRepository(BaseRepository[User]):
         except SQLAlchemyError as e:
             await self.session.rollback()
             raise DataBaseException(str(e))
+        
     async def get_users_by_client_id(
         self, client_id: str, query: str, page: int, limit: int
     ) -> Dict[str, Union[List[User], int]]:

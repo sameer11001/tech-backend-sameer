@@ -1,3 +1,4 @@
+
 from app.core.exceptions.custom_exceptions.ForbiddenException import ForbiddenException
 from app.user_management.user.models.User import User
 from app.user_management.user.services.UserService import UserService
@@ -6,7 +7,8 @@ from app.utils.encryption import get_hash
 class ForcePasswordResetByAdmin:
     def __init__(self, user_service: UserService):
         self.user_service = user_service
-
+   
+    
     async def execute(self, acting_user_id: str, user_id: str, new_password: str):
 
         user: User = await self.user_service.get(user_id)

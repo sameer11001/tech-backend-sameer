@@ -1,4 +1,5 @@
 from fastapi import Depends
+
 from app.user_management.user.models.User import User
 from app.user_management.user.v1.schemas.response.GetUsersResponse import GetUsersResponse
 from app.user_management.user.services.ClientService import ClientService
@@ -14,6 +15,7 @@ class GetUsersByClientId:
         self.user_service = user_service
         self.client_service = client_service
 
+       
     async def execute(self, user_id: str, query: str = None, page: int = 1, limit: int = 10):
 
         user: User = await self.user_service.get(user_id)

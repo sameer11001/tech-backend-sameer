@@ -96,10 +96,12 @@ BEGIN
     p_conversation_id := uuid_generate_v7();
     INSERT INTO conversations (
         id, created_at, updated_at,
-        status, contact_id, assignment_id, client_id
+        status, contact_id, assignment_id, client_id,
+        is_open, chatbot_triggered
     ) VALUES (
         p_conversation_id, ts_now, ts_now,
-        'pending', v_contact_id, v_assignment_id, v_client_id
+        'broadcast', v_contact_id, v_assignment_id, v_client_id,
+        FALSE, TRUE
     );
 
     p_message_id := uuid_generate_v7();

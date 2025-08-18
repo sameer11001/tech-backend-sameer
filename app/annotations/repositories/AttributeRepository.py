@@ -57,12 +57,12 @@ class AttributeRepository(BaseRepository[Attribute]):
             await self.session.rollback()
             raise DataBaseException(str(e))
     
-    async def get_by_client_id_and_search(self, client_id: str, page: int, limit: int, search: Optional[str] = None):
+    async def get_by_client_id_and_search(self, client_id: str, page: int, limit: int, query: Optional[str] = None):
         try:
             base_query = select(Attribute).where(Attribute.client_id == client_id)
 
-            if search:
-                base_query = base_query.where(Attribute.name.ilike(f"%{search}%"))
+            if query:
+                base_query = base_query.where(Attribute.name.ilike(f"%{query}%"))
 
             count_query = select(func.count()).select_from(base_query.subquery())
             total_result = await self.session.exec(count_query)

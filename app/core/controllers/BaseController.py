@@ -1,6 +1,9 @@
 from fastapi import APIRouter, Depends, File, UploadFile 
 import fastapi
-from app.core.broker.WhatsappMessagePublisher import WhatsappMessagePublisher
+from sqlalchemy import text
+from sqlmodel import Session
+from app.core.storage.postgres import PostgresDatabase, provide_session
+from app.events.pub.WhatsappMessagePublisher import WhatsappMessagePublisher
 from app.core.config.container import Container
 from app.core.schemas.BaseResponse import ApiResponse
 import sys
@@ -8,6 +11,7 @@ import sys
 from dependency_injector.wiring import Provide, inject
 
 from app.core.services.S3Service import S3Service
+from app.events.pub.test_everything import TestPublisher
 
 router = APIRouter()
 
@@ -43,3 +47,23 @@ async def get_url(
 ):
     url = s3.generate_presigned_url(key)
     return {"url": url}
+
+
+@router.get("/test_flow_celery")
+@inject
+async def test_flow_celery(
+    data: str,
+    publisher:TestPublisher = Depends(Provide[Container.test_publisher]),
+):
+    test_data = {"test_flow_data": data}
+    await publisher.send_message(test_data)
+    
+    
+@router.get("/get_users_data", response_model=ApiResponse)
+async def get_users_data():
+    db = PostgresDatabase(db_url="postgresql+asyncpg://postgres:password@postgres/db_name")
+    async_session : Session = await provide_session(db_instance=db)
+    stmt = text("Select * from users")
+    result = await async_session.exec(stmt)
+    data  = result.fetchone()
+    return ApiResponse.success_response(data=data[0],message="Server is up and running", status_code=200)

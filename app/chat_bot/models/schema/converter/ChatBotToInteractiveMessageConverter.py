@@ -1,5 +1,3 @@
-# app/whatsapp/interactive/converter/ChatBotToInteractiveMessageConverter.py
-
 from typing import List, Optional, Dict, Any
 from app.chat_bot.models.schema.chat_bot_body.DynamicFlowNodeRequest import DynamicFlowNodeRequest
 from app.chat_bot.models.schema.chat_bot_body.DynamicChatBotRequest import DynamicChatBotRequest
@@ -7,6 +5,7 @@ from app.chat_bot.models.schema.interactive_builder.WhatsAppInteractiveMessageBu
 from app.chat_bot.models.schema.request.CreateInteractiveMessageRequest import CreateInteractiveMessageRequest
 from app.utils.enums.FlowNodeType import FlowNodeType
 from app.utils.validators.validate_interactive_message import InteractiveMessageValidator
+
 
 class ChatBotToInteractiveMessageConverter:
     
@@ -18,17 +17,15 @@ class ChatBotToInteractiveMessageConverter:
         flow_node: DynamicFlowNodeRequest,
         recipient: str
     ) -> Optional[CreateInteractiveMessageRequest]:
-
-        if flow_node.type != FlowNodeType.QUESTION_WITH_BUTTONS:
+        
+        if flow_node.type != FlowNodeType.INTERACTIVE_BUTTONS:
             return None
         
-        # Extract body text
         body_text = self._extract_text_content(flow_node)
         if not body_text:
             return None
         
-        # Extract buttons
-        buttons = self._extract_buttons(flow_node)
+        buttons = self._extract_buttons_for_whatsapp(flow_node)
         if not buttons:
             return None
         
@@ -41,7 +38,6 @@ class ChatBotToInteractiveMessageConverter:
                 footer_text=None
             )
         except Exception as e:
-            # Log error in production
             print(f"Error converting flow node to interactive message: {e}")
             return None
     
@@ -50,10 +46,7 @@ class ChatBotToInteractiveMessageConverter:
         flow_node: DynamicFlowNodeRequest,
         recipient: str
     ) -> Optional[Dict[str, Any]]:
-        """
-        Convert a flow node to regular WhatsApp text message
-        Used for QUESTION and MESSAGE nodes
-        """
+        
         if flow_node.type not in [FlowNodeType.QUESTION, FlowNodeType.MESSAGE]:
             return None
         
@@ -76,7 +69,8 @@ class ChatBotToInteractiveMessageConverter:
         chatbot_request: DynamicChatBotRequest,
         recipient: str
     ) -> Dict[str, Any]:
-
+        """Convert entire chatbot request to WhatsApp messages"""
+        
         result = {
             "interactive_messages": [],
             "text_messages": [],
@@ -92,25 +86,19 @@ class ChatBotToInteractiveMessageConverter:
         
         for node in chatbot_request.nodes:
             try:
-                if node.type == FlowNodeType.QUESTION_WITH_BUTTONS:
+                if node.type == FlowNodeType.INTERACTIVE_BUTTONS:
                     interactive_msg = self.convert_flow_node_to_interactive_message(node, recipient)
                     if interactive_msg:
-                        validation_errors = self._validate_converted_message(node)
-                        if validation_errors:
-                            result["validation_errors"].extend([
-                                f"Node '{node.name}': {error}" for error in validation_errors
-                            ])
-                        else:
-                            result["interactive_messages"].append({
-                                "node_name": node.name,
-                                "node_type": node.type.value,
-                                "message": interactive_msg.dict(),
-                                "next_nodes": node.next_nodes or [],
-                                "is_final": node.is_final,
-                                "is_first": node.is_first,
-                                "service_hook": node.service_hook.dict() if node.service_hook else None
-                            })
-                            result["flow_metadata"]["interactive_nodes"] += 1
+                        result["interactive_messages"].append({
+                            "node_name": node.name,
+                            "node_type": node.type.value,
+                            "message": interactive_msg.model_dump(),
+                            "next_nodes": node.next_nodes or [],
+                            "is_final": node.is_final,
+                            "is_first": node.is_first,
+                            "service_hook": node.service_hook.model_dump() if node.service_hook else None
+                        })
+                        result["flow_metadata"]["interactive_nodes"] += 1
                     else:
                         result["validation_errors"].append(f"Failed to convert node '{node.name}' to interactive message")
                         result["flow_metadata"]["skipped_nodes"] += 1
@@ -125,7 +113,7 @@ class ChatBotToInteractiveMessageConverter:
                             "next_nodes": node.next_nodes or [],
                             "is_final": node.is_final,
                             "is_first": node.is_first,
-                            "service_hook": node.service_hook.dict() if node.service_hook else None
+                            "service_hook": node.service_hook.model_dump() if node.service_hook else None
                         })
                         result["flow_metadata"]["text_nodes"] += 1
                     else:
@@ -142,6 +130,7 @@ class ChatBotToInteractiveMessageConverter:
         return result
     
     def _extract_text_content(self, flow_node: DynamicFlowNodeRequest) -> Optional[str]:
+        
         if not flow_node.text:
             return None
         
@@ -153,48 +142,21 @@ class ChatBotToInteractiveMessageConverter:
         
         return text_content.strip() if text_content else None
     
-    def _extract_buttons(self, flow_node: DynamicFlowNodeRequest) -> Optional[List[Dict[str, str]]]:
-        if not flow_node.buttons or 'options' not in flow_node.buttons:
+    def _extract_buttons_for_whatsapp(self, flow_node: DynamicFlowNodeRequest) -> Optional[List[Dict[str, str]]]:
+        
+        if not flow_node.buttons or "options" not in flow_node.buttons:
             return None
         
-        buttons = []
-        for option in flow_node.buttons['options']:
-            button_text = option.get('text', option.get('title', ''))
-            button_id = option.get('id', option.get('value', button_text.lower().replace(' ', '_')))
-            
-            if button_text and button_id:
-                buttons.append({
-                    "id": button_id[:256],  
-                    "title": button_text[:20]  
+        options = flow_node.buttons["options"]
+        if not isinstance(options, list):
+            return None
+        
+        whatsapp_buttons = []
+        for option in options:
+            if isinstance(option, dict) and "text" in option and "id" in option:
+                whatsapp_buttons.append({
+                    "id": option["id"],
+                    "title": option["text"]
                 })
         
-        return buttons if buttons else None
-    
-    def _validate_converted_message(self, flow_node: DynamicFlowNodeRequest) -> List[str]:
-        errors = []
-        
-        text_content = self._extract_text_content(flow_node)
-        if not text_content:
-            errors.append("Missing or empty text content")
-        elif len(text_content) > 1024:
-            errors.append("Text content exceeds 1024 characters")
-        
-        if flow_node.type == FlowNodeType.QUESTION_WITH_BUTTONS:
-            buttons = self._extract_buttons(flow_node)
-            if not buttons:
-                errors.append("Missing or invalid button options")
-            elif len(buttons) > 3:
-                errors.append("Too many buttons (max 3)")
-            else:
-                for i, button in enumerate(buttons):
-                    if not button.get('title'):
-                        errors.append(f"Button {i+1}: Missing button text")
-                    elif len(button['title']) > 20:
-                        errors.append(f"Button {i+1}: Button text too long (max 20 chars)")
-                    
-                    if not button.get('id'):
-                        errors.append(f"Button {i+1}: Missing button ID")
-                    elif len(button['id']) > 256:
-                        errors.append(f"Button {i+1}: Button ID too long (max 256 chars)")
-        
-        return errors
+        return whatsapp_buttons if whatsapp_buttons else None

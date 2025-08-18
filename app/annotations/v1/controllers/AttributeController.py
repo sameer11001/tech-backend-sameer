@@ -1,5 +1,6 @@
 from typing import Optional
 from fastapi import APIRouter, Depends, status
+from fastapi import Query
 
 from app.annotations.v1.schemas.request.CreateAttributeRequest import  CreateAttributeRequest
 from app.annotations.v1.schemas.response.GetAttributeByContactResponse import AttributesByContactResponse
@@ -22,24 +23,20 @@ from app.annotations.v1.use_case.GetAttributes import GetAttributes
 from app.annotations.v1.use_case.UpdateAttribute import UpdateAttribute
 from app.utils.generate_responses import generate_responses
 
-
-router = APIRouter(prefix="/attributes")
-
-
-
+router = APIRouter()
 @router.get("/", response_model=ApiResponse[GetAttributeResponse],
             responses = {**generate_responses([],default_exception=True)},
             status_code=status.HTTP_200_OK)
 @inject
 async def get_attributes(
-    limit: int = 10,
-    page: int = 1,
-    search: Optional[str] = None,
+    limit: int = Query(10, description="Number of items per page"),
+    page: int = Query(1, description="Page number"),
+    query: str = Query(None, description="Search query"),
     get_attributes: GetAttributes = Depends(Provide[Container.attribute_get_attributes]),
     token: dict = Depends(get_current_user),
 ):  
     try:
-        result = await get_attributes.execute(token["userId"], limit, page, search)
+        result = await get_attributes.execute(token["userId"], limit, page, query)
         return ApiResponse.success_response(data=result)
     except GlobalException as e:
         raise e

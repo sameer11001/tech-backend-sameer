@@ -1,4 +1,5 @@
 from app.core.config.logger import get_logger
+
 from app.core.exceptions.custom_exceptions.ForbiddenException import ForbiddenException
 from app.user_management.user.models.Team import Team
 from app.user_management.user.models.User import User
@@ -12,7 +13,7 @@ class DeleteTeam:
         self.team_service = team_service
         self.user_service = user_service
 
-        
+    
     async def execute(self,user_id: str, team_name: str):
         logger.info(f"team: {team_name}")
 

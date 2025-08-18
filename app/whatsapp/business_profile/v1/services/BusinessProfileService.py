@@ -25,7 +25,7 @@ class BusinessProfileService(BaseService[BusinessProfile]):
 
         return business_profile
     
-    async def get_by_phone_number_id(self, phone_number_id: str):
+    async def get_by_phone_number_id(self, phone_number_id: str) -> BusinessProfile:
         business_profile = await self.repository.get_by_phone_number_id(phone_number_id)
 
         if not business_profile:

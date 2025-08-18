@@ -14,11 +14,6 @@ class HeaderComponentBuilder(ComponentBuilder):
         
         if header_data.type == HeaderType.TEXT and header_data.text:
             component["text"] = header_data.text
-        elif header_data.type == HeaderType.IMAGE and header_data.image:
-            component["image"] = header_data.image
-        elif header_data.type == HeaderType.VIDEO and header_data.video:
-            component["video"] = header_data.video
-        elif header_data.type == HeaderType.DOCUMENT and header_data.document:
-            component["document"] = header_data.document
-        
+        elif header_data.type == HeaderType.MEDIA and header_data.media:
+            component["media"] = header_data.media
         return component

@@ -1,3 +1,4 @@
+
 from app.utils.RedisHelper import RedisHelper
 from app.whatsapp.team_inbox.models.Conversation import Conversation
 from app.whatsapp.template.models.Template import Template
@@ -49,7 +50,7 @@ class TemplateMessage:
         self.assignment_service = assignment_service
         self.template_service = template_service
         
-        
+    
     async def execute(self, user_id: str,
                         template_id: str,
                         recipient_number: str,

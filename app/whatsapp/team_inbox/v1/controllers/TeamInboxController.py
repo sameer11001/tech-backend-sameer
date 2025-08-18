@@ -1,21 +1,17 @@
 from fastapi import APIRouter, Depends
-
 from dependency_injector.wiring import Provide, inject
-
 from app.core.config.container import Container
 from app.core.exceptions.GlobalException import GlobalException
-
 from app.core.security.JwtUtility import get_current_user
 from app.whatsapp.team_inbox.models.schema.request.ConversationUserAssignRequest import ConversationUserAssignRequest
 from app.whatsapp.team_inbox.models.schema.request.UpdateConversationStatusRequest import UpdateConversationStatusRequest
 from app.whatsapp.team_inbox.v1.schemas.request.CreateConversationRequest import CreateConversationRequest
-from app.whatsapp.team_inbox.v1.use_case import GetUserConversations
+from app.whatsapp.team_inbox.v1.use_case.GetUserConversations import GetUserConversations
 from app.whatsapp.team_inbox.v1.use_case.AssignedUserToConversation import AssignedUserToConversation
 from app.whatsapp.team_inbox.v1.use_case.CreateNewConversation import CreateNewConversation
 from app.whatsapp.team_inbox.v1.use_case.UpdateConversationStatus import UpdateConversationStatus
 
-
-router = APIRouter(prefix="/team_inbox")
+router = APIRouter()
 
 @router.post("/create_conversation")
 @inject
@@ -39,10 +35,11 @@ async def get_conversations(
                                 token: str = Depends(get_current_user),
                                 page: int = 1,
                                 limit: int = 10,
+                                search_terms: str = None,
                                 get_conversations: GetUserConversations = Depends(Provide[Container.get_conversations]),
                                 ):
         try:
-                result = await get_conversations.excute(token["userId"], page, limit)
+                result = await get_conversations.excute(token["userId"], page, limit, search_terms)
                 return result
         except GlobalException as e:
                 raise e

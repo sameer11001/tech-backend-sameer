@@ -1,5 +1,6 @@
 from typing import Any, Dict
 from app.annotations.services.ContactService import ContactService
+
 from app.core.repository.MongoRepository import MongoCRUD
 from app.core.schemas.BaseResponse import ApiResponse
 from app.core.storage.redis import AsyncRedisService
@@ -35,7 +36,8 @@ class ReplyWithReactionMessage:
         self.message_service = message_service
         self.mongo_crud = mongo_crud
         self.redis_service = redis_service
-        
+
+            
     async def execute(self, user_id: str,
                             emoji: str,
                             recipient_number: str,
@@ -66,7 +68,7 @@ class ReplyWithReactionMessage:
         
         for wa_message_id in messages_id:
             message_meta_data : MessageMeta = MessageMeta(
-                message_type = "emoji",
+                message_type = "reaction",
                 message_status = "sent",
                 whatsapp_message_id = wa_message_id["id"],
                 conversation_id = conversation.id,

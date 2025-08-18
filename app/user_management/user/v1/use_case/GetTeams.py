@@ -1,5 +1,6 @@
 from fastapi import Depends
 
+
 from app.core.schemas.BaseResponse import ApiResponse
 from app.user_management.user.models.User import User
 from app.user_management.user.v1.schemas.response.GetTeamsWithUsersResponse import ListOfTeamsWithUsersDTO
@@ -15,6 +16,7 @@ class GetTeams:
         self.team_service = team_service
         self.user_service = user_service
 
+    
     async def execute(self, user_id: str, query: str = None, page: int = 1, limit: int = 10) -> ListOfTeamsWithUsersDTO:
         
         user_client_id:User = await self.user_service.get(user_id)

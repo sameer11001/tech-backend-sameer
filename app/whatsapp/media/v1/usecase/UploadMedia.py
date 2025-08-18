@@ -1,4 +1,5 @@
 from fastapi import UploadFile
+
 from app.core.schemas.BaseResponse import ApiResponse
 from app.core.services.S3Service import S3Service
 from app.user_management.user.models.Client import Client
@@ -29,6 +30,7 @@ class UploadMedia:
         self.aws_region = aws_region
         self.aws_s3_bucket_name = aws_s3_bucket_name
 
+    
     async def execute(self, user_id: str, file: UploadFile) -> dict:
 
         user: User = await self.user_service.get(user_id)

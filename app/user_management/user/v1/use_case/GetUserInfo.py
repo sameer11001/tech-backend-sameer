@@ -1,5 +1,6 @@
 from typing import  Dict, Any
 
+
 from app.core.storage.redis import AsyncRedisService
 from app.user_management.user.models.User import User
 from app.user_management.user.v1.schemas.dto.UserDTO import UserWithRolesAndTeams
@@ -13,7 +14,7 @@ class GetUserInfo:
         self.user_service = user_service
         self.redis = redis_service
 
-
+    
     async def execute(self, user_id: str) -> UserWithRolesAndTeams:
         key = RedisHelper.redis_user_info_key(user_id)
 

@@ -19,11 +19,7 @@ from app.core.exceptions.custom_exceptions.UnAuthorizedException import UnAuthor
 from app.core.schemas.BaseResponse import ApiResponse
 from app.utils.generate_responses import generate_responses
 
-
-router = APIRouter(prefix="/tags")
-
-
-
+router = APIRouter()
 
 @router.get("/", responses={**generate_responses([DataBaseException,
                                                     UnAuthorizedException,

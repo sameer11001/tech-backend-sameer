@@ -1,3 +1,4 @@
+from app.chat_bot.models.ChatBot import FlowNode
 from app.whatsapp.broadcast.use_case.BroadcastConfig import BroadcastConfig
 from app.whatsapp.template.models.Template import Template
 from fastapi import FastAPI
@@ -15,6 +16,8 @@ from app.utils.enums.RoleEnum import RoleEnum
 from app.utils.encryption import get_hash
 from app.whatsapp.team_inbox.models.Message import Message
 from app.core.config.settings import settings
+from app.events.app_events_route import rabbitmq_router
+
 ROLES = [
     "ADMINISTRATOR",
     "AUTOMATION_MANAGER",
@@ -31,15 +34,16 @@ ROLES = [
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     mongo = MongoDB(settings.MONGO_URI, settings.MONGO_DB)
-    await mongo.init_db([Message, Template])     
+    await mongo.init_db([Message, Template,FlowNode])     
     broadcast_config : BroadcastConfig = await Container.broadcast_broadcast_config()
+
+    db_instance = Container.psql()
     try:
-        db_instance = Container.psql()
         await db_instance.init_db()                  
         async with db_instance._session_factory() as db:
             # Create roles
             async def get_or_create_role(role_name: str) -> Role:
-                result = await db.execute(
+                result = await db.exec(
                     select(Role).filter_by(role_name=RoleEnum(role_name))
                 )
                 role = result.scalar_one_or_none()
@@ -51,21 +55,18 @@ async def lifespan(app: FastAPI):
                     db.add(role)
                     await db.flush()
                 return role
-
             # Initialize roles
             for role_name in ROLES:
                 await get_or_create_role(role_name)
-
             # Create or get client
-            result = await db.execute(select(Client))
+            result = await db.exec(select(Client))
             client = result.scalar_one_or_none()
             if not client:
                 client = Client(client_id=100)
                 db.add(client)
                 await db.flush()
-
             # Create or get team
-            result = await db.execute(select(Team).filter_by(name="Example Team"))
+            result = await db.exec(select(Team).filter_by(name="Example Team"))
             team = result.scalar_one_or_none()
             if not team:
                 team = Team(
@@ -76,9 +77,8 @@ async def lifespan(app: FastAPI):
                 )
                 db.add(team)
                 await db.flush()
-
             # Create or get business profile
-            result = await db.execute(
+            result = await db.exec(
                 select(BusinessProfile).filter_by(business_id="904055570973681")
             )
             business_profile = result.scalar_one_or_none()
@@ -94,18 +94,15 @@ async def lifespan(app: FastAPI):
                 )
                 db.add(business_profile)
                 await db.flush()
-
             # Create users
-            result = await db.execute(select(User))
+            result = await db.exec(select(User))
             users = result.scalars().all()
             emails_in_use = {u.email for u in users}
-
             for i, role_name in enumerate(ROLES, start=1):
                 user_email = f"user{i}@example.com"
                 if user_email in emails_in_use:
                     continue
-
-                result = await db.execute(
+                result = await db.exec(
                     select(Role).filter_by(role_name=RoleEnum(role_name))
                 )
                 user_role = result.scalar_one()
@@ -113,7 +110,7 @@ async def lifespan(app: FastAPI):
                     first_name=f"First{i}",
                     last_name=f"Last{i}",
                     email=user_email,
-                    phone_number=f"+962791122048{i}",
+                    phone_number=f"+96279112204{i}",
                     password=get_hash(f"Password{i}"),
                     is_base_admin=(role_name == "ADMINISTRATOR"),
                     online_status=True,
@@ -122,14 +119,15 @@ async def lifespan(app: FastAPI):
                 new_user.roles.append(user_role)
                 new_user.teams.append(team)
                 db.add(new_user)
-
             # Commit all changes
             await db.commit()
             await broadcast_config.start_listener()
-        yield
+            await rabbitmq_router.startup()
+            yield
     finally:
         # Cleanup
         await db_instance._engine.dispose()
         mongo.client.close()   
+        await rabbitmq_router.shutdown()
         await broadcast_config.stop_listener()
 

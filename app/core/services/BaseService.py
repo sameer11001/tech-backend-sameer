@@ -15,7 +15,7 @@ class BaseService(Generic[T]):
         return await self.repository.create(obj, commit=commit)
 
     async def get(self, id: UUID, should_exist: bool = True) -> T:
-        obj = await self.repository.get(id)
+        obj = await self.repository.get_by_id(id)
         if should_exist and not obj:
             raise EntityNotFoundException()
         if not should_exist and obj:

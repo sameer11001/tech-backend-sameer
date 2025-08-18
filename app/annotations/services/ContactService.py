@@ -1,4 +1,4 @@
-from typing import Optional
+from typing import List, Optional
 
 from fastapi import logger
 from app.annotations.models.Contact import Contact
@@ -34,8 +34,8 @@ class ContactService(BaseService[Contact]):
             raise EntityNotFoundException("Contact not found")
         return contact
     
-    async def updateContractAttributes(self, contact_id: str, attribute: ContactAttributeLink):
-        return await self.repository.updateContractAttributes(contact_id, attribute)
+    async def updateContactAttributes(self,contact_id: str,attributes: List[ContactAttributeLink]):
+        return await self.repository.updateContactAttribute(contact_id, attributes)
 
     async def updateContactTags(self, contact_id: str, tags: list[ContactTagLink]):
         return await self.repository.updateContactTags(contact_id, tags)

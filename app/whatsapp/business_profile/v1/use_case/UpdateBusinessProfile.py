@@ -1,6 +1,7 @@
 import os
 import tempfile
 from fastapi import UploadFile
+
 from app.core.exceptions.custom_exceptions.ClientExceptionHandler import ClientException
 from app.whatsapp.business_profile.external_services.BusinessProfileApi import BusinessProfileApi
 from app.whatsapp.business_profile.v1.models.BusinessProfile import BusinessProfile
@@ -19,6 +20,7 @@ class UpdateBusinessProfile:
         self.user_service = user_service
         self.bp_service = business_profile_service
 
+    
     async def execute(self, user_id: str, image: UploadFile | None, data: dict):
         user = await self.user_service.get(user_id)
         bp: BusinessProfile = await self.bp_service.get_by_client_id(client_id=user.client.id)

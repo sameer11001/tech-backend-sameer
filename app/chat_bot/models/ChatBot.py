@@ -1,48 +1,41 @@
-from datetime import datetime, timezone
-from typing import Dict, List, Optional
+from datetime import datetime
+from typing import Dict, List, Optional, Any
 from uuid import UUID
-from beanie import Document, Insert, Replace, before_event
+from beanie import Document, Indexed, Insert, Replace, before_event
 from pydantic import BaseModel, Field
 
-from app.utils.enums.ChatBotLanguageEnum import ChatBotLanguage
+from app.utils.enums.FlowNodeType import FlowNodeType
 from app.core.schemas.BaseModelNoNone import BaseModelNoNone
 from app.utils.DateTimeHelper import DateTimeHelper
 
 class ServiceHook(BaseModel):
-    type: str
-    action: str
-    on_success: str
-    on_failure: str
+    service_type: Optional[str] = None
+    service_action: Optional[str] = None
+    on_success: Optional[str] = None
+    on_failure: Optional[str] = None
 
-class FlowNode(BaseModel):
-    id: str
+class FlowNodeButtons(BaseModel):
     type: str
-    text: dict [str, str] | None = None
-    name : str | None = None
-    is_final: bool | None = None
-    buttons: dict [str, str] | None = None
-    body: dict[str, str] | None = None
-    service: ServiceHook | None = None
-    
-    next_nodes: Optional[List[str]] = Field(default_factory=list)
+    title: str
+    next_node_id: Optional[str] = None
+
+class FlowNode(Document, BaseModelNoNone):
+    id: str = Field(..., alias="_id")
+    chat_bot_id:UUID = Indexed()
+    type: FlowNodeType
+    buttons: Optional[List[FlowNodeButtons]] = None
+    body: Optional[Dict[str, Any]] = None
+    is_final: Optional[bool] = False
+    is_first: bool = Indexed()
+    next_nodes: Optional[str] = None
     position: Optional[Dict[str, float]] = None
+    service_hook: Optional[ServiceHook] = None
 
-class ChatBot(Document,BaseModelNoNone):
-    id: UUID = Field(alias="_id")
-    name : str
-    version: float
-    default_locale: ChatBotLanguage = ChatBotLanguage.ENGLISH
-    schema_version: int
-    nodes: list[str,FlowNode]
-    
-    first_node_id: str
-    total_nodes: int = Field(default=0)
-    
     created_at: datetime = Field(
-        default_factory= DateTimeHelper.now_utc
+        default_factory=DateTimeHelper.now_utc
     )
     updated_at: datetime = Field(
-        default_factory= DateTimeHelper.now_utc
+        default_factory=DateTimeHelper.now_utc
     )
     
     @before_event([Insert, Replace])
@@ -50,7 +43,9 @@ class ChatBot(Document,BaseModelNoNone):
         self.updated_at = DateTimeHelper.now_utc()    
 
     class Settings:
-        name = "chat_bots"
-
+        name = "chatbot_flow_nodes"
+        indexes = indexes = [
+        [("chat_bot_id", 1), ("is_first", 1)]
+    ]
     class Config:
-        arbitrary_types_allowed = True    
+        arbitrary_types_allowed = True

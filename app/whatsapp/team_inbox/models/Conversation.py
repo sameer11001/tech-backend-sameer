@@ -16,6 +16,8 @@ class Conversation(BaseEntity, table=True):
     
     contact_id: UUID = Field(foreign_key="contacts.id", index=True, ondelete="CASCADE")
     
+    chatbot_triggered: bool = Field(default=True, nullable=False)
+    
     assignment_id: UUID = Field(foreign_key="assignments.id")
     
     client_id: UUID = Field(foreign_key="clients.id", index=True, ondelete="CASCADE")

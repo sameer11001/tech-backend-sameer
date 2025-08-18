@@ -1,5 +1,3 @@
-# app/whatsapp/interactive/models/schema/interactive_body/DynamicInteractiveMessageRequest.py
-
 from typing import Optional
 from pydantic import BaseModel, field_validator
 

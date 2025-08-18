@@ -1,3 +1,4 @@
+
 import phonenumbers
 from app.annotations.models.Contact import Contact
 from app.annotations.models.ContactAttributeLink import ContactAttributeLink
@@ -14,7 +15,7 @@ class CreateContact:
         self.contact_service = contact_service
         self.user_service = user_service
         self.attribute_service = attribute_service
-
+        
     async def execute(self, user_id: str, name: str, phone_number: str, attributes: list[AttributeDto] = []):
         user: User = await self.user_service.get(user_id)
         client: Client = user.client

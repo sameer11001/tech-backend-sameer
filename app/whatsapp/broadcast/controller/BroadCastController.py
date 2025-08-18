@@ -7,15 +7,13 @@ from app.core.exceptions.GlobalException import GlobalException
 from app.core.exceptions.custom_exceptions.UnAuthorizedException import UnAuthorizedException
 from app.utils.generate_responses import generate_responses
 from dependency_injector.wiring import Provide, inject
-
 from app.core.config.container import Container
 from app.whatsapp.broadcast.models.schema.SchedualBroadCastRequest import SchedualBroadCastRequest
 from app.whatsapp.broadcast.use_case.BroadcastScheduler import BroadcastScheduler
 from app.whatsapp.broadcast.use_case.CancelBroadcast import CancelBroadcast
 from app.whatsapp.broadcast.use_case.GetBroadcasts import GetBroadcasts
 
-router = APIRouter(prefix="/broadcast")
-
+router = APIRouter()
 
 @router.get(
     "/",

@@ -1,9 +1,9 @@
 from datetime import datetime, timezone
 from uuid import UUID
 from app.annotations.services.ContactService import ContactService
-from app.core.broker.MessageBroadcastPublisher import MessageBroadcastPublisher
+
+from app.events.pub.MessageBroadcastPublisher import MessageBroadcastPublisher
 from app.core.config.logger import get_logger
-from app.core.exceptions.custom_exceptions.BadRequestException import BadRequestException
 from app.core.repository.MongoRepository import MongoCRUD
 from app.core.storage.redis import AsyncRedisService
 from app.user_management.user.models.Client import Client
@@ -43,6 +43,7 @@ class BroadcastScheduler:
             return dt.astimezone(timezone.utc).replace(tzinfo=None)
         return dt
         
+    
     async def schedule_broadcast(
         self,
         body_request: SchedualBroadCastRequest,

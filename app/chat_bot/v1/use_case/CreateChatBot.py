@@ -1,32 +1,43 @@
-from typing import List
-from app.chat_bot.models.ChatBot import ChatBot
+from typing import Any, Dict, List
+
+import uuid6
 from app.chat_bot.models.ChatBot import FlowNode, ServiceHook
 from app.chat_bot.models.ChatBotMeta import ChatBotMeta
 from app.chat_bot.models.schema.chat_bot_body.DynamicChatBotRequest import DynamicChatBotRequest
+from app.chat_bot.models.schema.chat_bot_body.DynamicFlowNodBodyRequest import ContentItem, MessageContentNodeRequest, QuestionContentNodeRequest
+from app.chat_bot.models.schema.chat_bot_body.DynamicFlowNodeRequest import DynamicFlowNodeRequest
 from app.chat_bot.models.schema.interactive_body.DynamicInteractiveMessageRequest import DynamicInteractiveMessageRequest
+from app.chat_bot.models.schema.request.CreateChatBotRequest import CreateChatBotRequest
+from app.chat_bot.models.schema.response.CreateChatBotResponse import CreateChatBotResponse
 from app.chat_bot.services.ChatBotService import ChatBotService
+
 from app.core.repository.MongoRepository import MongoCRUD
-from app.utils.enums.InteractiveMessageEnum import InteractiveType
-from app.utils.validators.validate_interactive_message import InteractiveMessageValidator
+from app.core.schemas.BaseResponse import ApiResponse
+from app.core.services.S3Service import S3Service
+from app.utils.enums.FlowNodeType import FlowNodeType
+from app.utils.enums.InteractiveMessageEnum import HeaderType, InteractiveType
+from app.utils.enums.MessageContentType import MessageContentType
+from app.whatsapp.business_profile.v1.models.BusinessProfile import BusinessProfile
 from app.whatsapp.business_profile.v1.services.BusinessProfileService import BusinessProfileService
+from app.whatsapp.media.external_services.WhatsAppMediaApi import WhatsAppMediaApi
 
 
 class CreateChatBot:
     def __init__(
         self,
-        chatbot_service: ChatBotService,
+        chat_bot_service: ChatBotService,
         business_service: BusinessProfileService,
-        mongo_crud_chat_bot: MongoCRUD[ChatBot]
     ):
-        self.chatbot_service = chatbot_service
+        self.chatbot_service = chat_bot_service
         self.business_service = business_service
 
+    
     async def execute(
         self,
         business_id: str,
-        request_body: DynamicChatBotRequest
+        request_body: CreateChatBotRequest
     ) -> ChatBotMeta:
-        business_profile = await self.business_service.get(business_id)
+        business_profile : BusinessProfile = await self.business_service.get(business_id)
         client_id = business_profile.client_id
 
         await self.chatbot_service.get_by_name(
@@ -35,72 +46,22 @@ class CreateChatBot:
             should_exist=False
         )
 
-        validation_errors = []
-        for node in request_body.nodes:
-            if hasattr(node, 'type') and node.type == InteractiveType.BUTTON or node.type == InteractiveType.LIST:
-                dynamic_interactive = DynamicInteractiveMessageRequest(
-                    type=node.type,
-                    header=node.text.get('header') if node.text else None,
-                    body=node.text,
-                    footer=node.text.get('footer') if node.text else None,
-                    action=node.buttons or {}
-                )
-                validation_errors = InteractiveMessageValidator.validate_interactive_message(dynamic_interactive)
-                if validation_errors:
-                    raise ValueError(f"Validation failed for interactive node '{node.name}': {validation_errors}")
-
-        domain_nodes: List[FlowNode] = []
-        for node in request_body.nodes:
-            svc = None
-            if node.service_hook:
-                svc = ServiceHook(
-                    type=node.service_hook.service_type,
-                    action=node.service_hook.service_action,
-                    on_success=node.service_hook.on_success,
-                    on_failure=node.service_hook.on_failure
-                )
-
-            domain_nodes.append(
-                FlowNode(
-                    id=node.name,
-                    type=node.type.value,
-                    text=node.text,
-                    buttons=node.buttons,
-                    body=node.body,
-                    name=node.name,
-                    is_final=node.is_final,
-                    service=svc,
-                    next_nodes=node.next_nodes or [],
-                    position=node.position
-                )
-            )
-
-        first_node = next(n for n in request_body.nodes if n.is_first)
-        first_node_id = first_node.name
-
         chatbot_meta = ChatBotMeta(
             name=request_body.name,
             client_id=client_id,
             version=request_body.version,
-            language=request_body.language,
-            schema_version=1,
-            first_node_id=first_node_id,
-            total_nodes=len(domain_nodes)
+            language=request_body.language
         )
 
         created = await self.chatbot_service.create(chatbot_meta)
         
-        chat_bot_document = ChatBot(
+        response_body = CreateChatBotResponse(
             id=created.id,
             name=created.name,
             version=created.version,
-            default_locale=created.default_locale,
-            schema_version=created.schema_version,
-            nodes=domain_nodes,
-            first_node_id=first_node_id,
-            total_nodes=len(domain_nodes),
-            created_at=created.created_at,
-            updated_at=created.updated_at
+            communicate_type=created.communicate_type,
+            created_at=created.created_at.isoformat(),
+            updated_at=created.updated_at.isoformat()
         )
-        
-        return created
+
+        return ApiResponse.success_response(data=response_body)

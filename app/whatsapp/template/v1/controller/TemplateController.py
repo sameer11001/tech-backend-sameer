@@ -1,6 +1,6 @@
 from fastapi import APIRouter, Path, Query
 from fastapi.params import Depends
-from app.core.broker.MessageBroadcastPublisher import MessageBroadcastPublisher
+from app.events.pub.MessageBroadcastPublisher import MessageBroadcastPublisher
 from app.core.security.JwtUtility import get_current_user
 from app.core.exceptions.custom_exceptions.ClientExceptionHandler import ClientException
 from app.core.exceptions.custom_exceptions.DataBaseException import DataBaseException
@@ -16,8 +16,7 @@ from app.core.config.container import Container
 from app.core.schemas.BaseResponse import ApiResponse
 from app.whatsapp.template.v1.usecase.GetTemplates import GetTemplates
 
-router = APIRouter(prefix="/template")
-
+router = APIRouter()
 
 @router.get(
     "/",

@@ -3,6 +3,7 @@ from uuid import UUID
 from app.annotations.models.Note import Note
 from app.annotations.services.ContactService import ContactService
 from app.annotations.services.NoteService import NoteService
+
 from app.core.schemas.BaseResponse import ApiResponse
 from app.user_management.user.services.UserService import UserService
 
@@ -17,7 +18,7 @@ class CreateNote:
         self.note_service = note_service
         self.contact_service = contact_service
         self.user_service = user_service
-
+    
     async def execute(self, content: str, contact_id: UUID, user_id: UUID) -> ApiResponse:
 
         user = await self.user_service.get(user_id)

@@ -1,3 +1,4 @@
+
 from app.core.storage.redis import AsyncRedisService
 from app.user_management.auth.services.RoleService import RoleService
 from app.core.exceptions.custom_exceptions.ForbiddenException import ForbiddenException
@@ -22,6 +23,7 @@ class EditUser:
         self.team_service = team_service
         self.redis = redis_service
 
+    
     async def execute(self, acting_user_id: str, user_id: str, update_data_body: EditUserRequest):
         acting_user: User = await self.user_service.get(acting_user_id)
         user: User = await self.user_service.get(user_id)

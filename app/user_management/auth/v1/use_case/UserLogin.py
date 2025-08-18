@@ -2,6 +2,7 @@ from datetime import datetime, timedelta, timezone
 import uuid6
 from fastapi import Request
 
+
 from app.utils.enums.SessionEnum import SessionEnum
 from app.user_management.user.models.Client import Client
 from app.user_management.auth.models.RefreshToken import RefreshToken
@@ -19,8 +20,6 @@ from app.core.exceptions.custom_exceptions.InvalidCredentialsException import In
 from app.whatsapp.business_profile.v1.models.BusinessProfile import BusinessProfile
 from app.whatsapp.business_profile.v1.services.BusinessProfileService import BusinessProfileService
 
-
-
 class UserLogin:
 
     def __init__(
@@ -35,7 +34,7 @@ class UserLogin:
         self.client_service = client_service
         self.business_profile_service = business_profile_service
     
-
+    
     async def execute(
         self, request: Request, user_email: str, user_password: str, client_id: int
     ):

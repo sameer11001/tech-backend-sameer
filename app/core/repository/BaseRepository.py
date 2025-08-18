@@ -14,7 +14,7 @@ class BaseRepository(Generic[T]):
         self.model = model
         self.session = session
 
-    async def get(self, id: UUID) -> T:
+    async def get_by_id(self, id: UUID) -> T:
         try:
             return await self.session.get(self.model, id)
         except SQLAlchemyError as e:
@@ -44,7 +44,7 @@ class BaseRepository(Generic[T]):
         try:
             if not isinstance(data, dict) and hasattr(data, "__dict__"):
                 data = {k: v for k, v in data.__dict__.items() if k != "_sa_instance_state"}
-            obj = await self.get(id)
+            obj = await self.get_by_id(id)
             if not obj:
                 raise EntityNotFoundException()
 
@@ -63,7 +63,7 @@ class BaseRepository(Generic[T]):
 
     async def delete(self, id: UUID, commit: bool = True):
         try:
-            obj = await self.session.get(self.model, id)
+            obj = await self.get_by_id(self.model, id)
             if not obj:
                 raise EntityNotFoundException()
             

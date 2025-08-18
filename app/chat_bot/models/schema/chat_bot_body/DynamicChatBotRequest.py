@@ -3,12 +3,12 @@ from collections import Counter
 from typing import List
 from pydantic import BaseModel, Field, field_validator, model_validator
 from app.chat_bot.models.schema.chat_bot_body.DynamicFlowNodeRequest import DynamicFlowNodeRequest
+from app.chat_bot.models.schema.interactive_body.DynamicInteractiveMessageRequest import DynamicInteractiveMessageRequest
+from app.utils.validators.validate_interactive_message import InteractiveMessageValidator
 
 class DynamicChatBotRequest(BaseModel):
-    name: str = Field(..., min_length=1, max_length=100)
-    language: str = Field(..., min_length=2, max_length=10)
+    chatbot_id: str
     nodes: List[DynamicFlowNodeRequest] = Field(..., min_items=1)
-    version: float = Field(..., gt=0)
     
     @field_validator('nodes')
     @classmethod
@@ -35,19 +35,21 @@ class DynamicChatBotRequest(BaseModel):
                         raise ValueError(f"Node '{node.name}' references non-existent next node '{next_node_name}'")
         
         return v
-    
-    @field_validator('language')
+
+    @field_validator('nodes', mode='after')
     @classmethod
-    def validate_language_code(cls, v: str):
-        valid_languages = ['en', 'ar', 'es', 'fr', 'de', 'it', 'pt', 'ru', 'zh', 'ja', 'ko', 'hi']
-        if v.lower() not in valid_languages:
-            raise ValueError(f"Unsupported language code: {v}")
-        return v.lower()
-    
+    def validate_interactive_nodes(cls, v: List[DynamicFlowNodeRequest]):
+        for node in v:
+            if node.body and node.body.body_button:
+                errs = InteractiveMessageValidator.validate_interactive_message(node.body.body_button)
+                if errs:
+                    raise ValueError(f"Interactive message validation failed in node '{node.name}': {errs}")
+        return v
+
     @model_validator(mode='after')
     def ensure_unique_node_ids(cls, model):
-        keys = [node.name for node in model.nodes]
+        keys = [node.id for node in model.nodes]
         duplicates = [key for key, count in Counter(keys).items() if count > 1]
         if duplicates:
-            raise ValueError(f"Duplicate node names found: {duplicates}")
+            raise ValueError(f"Duplicate node ids found: {duplicates}")
         return model

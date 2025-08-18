@@ -25,10 +25,8 @@ from app.core.schemas.BaseResponse import ApiResponse
 
 from app.utils.generate_responses import generate_responses
 
-
-router = APIRouter(prefix="/team")
+router = APIRouter()
 logger = get_logger(__name__)
-
 
 @router.get(
     "/",

@@ -1,4 +1,3 @@
-import logging
 from fastapi import APIRouter, Depends, Query
 from dependency_injector.wiring import Provide, inject
 
@@ -22,8 +21,7 @@ from app.user_management.user.v1.use_case.DeleteUserById import DeleteUserById
 from app.user_management.user.v1.use_case.GetUsersByClientId import GetUsersByClientId
 from app.utils.generate_responses import generate_responses
 
-
-router = APIRouter(prefix="/user")
+router = APIRouter()
 logger = get_logger(__name__)
 
 @router.get(

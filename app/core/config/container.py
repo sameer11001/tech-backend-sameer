@@ -26,18 +26,23 @@ from app.annotations.v1.use_case.UpdateAttributeByContact import UpdateAttribute
 from app.annotations.v1.use_case.UpdateContacts import UpdateContact
 from app.annotations.v1.use_case.UpdateNote import UpdateNote
 from app.annotations.v1.use_case.UpdateTag import UpdateTag
-from app.chat_bot.models.ChatBot import ChatBot
+from app.chat_bot.models.ChatBot import FlowNode
 from app.chat_bot.repositories.ChatBotRepositories import ChatBotRepository
+from app.chat_bot.services.ChatbotContextService import ChatbotContextService
 from app.chat_bot.services.ChatBotService import ChatBotService
 from app.chat_bot.v1.use_case.CreateChatBot import CreateChatBot
-from app.core.broker.MessageBroadcastPublisher import MessageBroadcastPublisher
+from app.chat_bot.v1.use_case.DeleteChatBot import DeletChatBot
+from app.events.pub.ChatBotTriggerPublisher import ChatBotTriggerPublisher
+from app.events.pub.ChatbotFlowPublisher import ChatbotFlowPublisher
+from app.events.pub.MessageBroadcastPublisher import MessageBroadcastPublisher
 from app.core.broker.RabbitMQBroker import RabbitMQBroker,RabbitMQSettings
-from app.core.broker.WhatsappMessagePublisher import  WhatsappMessagePublisher
+from app.events.pub.WhatsappMessagePublisher import  WhatsappMessagePublisher
 from app.core.exceptions.ErrorHandler import raise_for_status
 
 from app.core.repository.MongoRepository import MongoCRUD
 from app.core.services.S3Service import S3Service
 from app.core.storage.redis import AsyncRedisService
+from app.events.pub.test_everything import TestPublisher
 from app.real_time.socketio.socket_gateway import SocketMessageGateway
 from app.real_time.webhook.services.MessageHook import MessageHook
 from app.real_time.webhook.services.TemplateHook import TemplateHook
@@ -102,7 +107,7 @@ from app.user_management.auth.v1.use_case.TokenRefresh import TokenRefresh
 from app.user_management.auth.v1.use_case.UserLogin import UserLogin
 from app.user_management.auth.v1.use_case.UserLogout import UserLogout
 from app.core.config.settings import Settings
-from app.core.storage.postgres import PostgresDatabase, get_session
+from app.core.storage.postgres import PostgresDatabase, provide_session
 from app.user_management.user.repositories.ClientRepository import ClientRepository
 from app.user_management.user.repositories.TeamRepository import TeamRepository
 from app.user_management.user.services.ClientService import ClientService
@@ -145,9 +150,9 @@ class Container(containers.DeclarativeContainer):
             'app.core.controllers.BaseController',
             'app.annotations.v1.controllers.NoteController',
             'app.chat_bot.v1.controllers.ChatBotController',
+            'app.events.app_events_route'
         ]
     )
-
     
     #----- CONFIG -----
     config = providers.Configuration()
@@ -163,10 +168,10 @@ class Container(containers.DeclarativeContainer):
         AsyncServer,
         async_mode="asgi",
         client_manager=redis_manager,
-        cors_allowed_origins=["http://localhost:4200","http://localhost:59943"],
+        cors_allowed_origins=["http://localhost:4200"],
         transports=['websocket'],
-        logger=True,
-        engineio_logger=True,
+        logger=False,    
+        engineio_logger=False,
     )
     
     #----- AWS Config -----
@@ -210,13 +215,14 @@ class Container(containers.DeclarativeContainer):
     
     #----- STORAGE Config -----
     psql = providers.Singleton(PostgresDatabase, db_url = config.POSTGRES_DATABASE_URL)
-    session = providers.Resource(get_session, db_instance=psql)
+    session = providers.Resource(provide_session, db_instance=psql)
+    
 
     http_client = providers.Singleton(httpx.AsyncClient, event_hooks={'response': [raise_for_status]}, timeout=120)
     
     mongo_crud_message = providers.Singleton(MongoCRUD, model = Message) 
     mongo_crud_template = providers.Singleton(MongoCRUD, model = Template) 
-    mongo_crud_chat_bot = providers.Singleton(MongoCRUD, model=ChatBot)
+    mongo_crud_chat_bot = providers.Singleton(MongoCRUD, model=FlowNode)
     
     rabbitmq_settings = providers.Singleton(
         RabbitMQSettings,
@@ -246,24 +252,27 @@ class Container(containers.DeclarativeContainer):
     #----- pub/sub -----
     message_publisher = providers.Singleton(WhatsappMessagePublisher, connection=rabbitmq_connection)
     message_broadcast_publisher = providers.Singleton(MessageBroadcastPublisher, connection=rabbitmq_connection)
+    chat_bot_trigger_publisher = providers.Singleton(ChatBotTriggerPublisher, connection=rabbitmq_connection)
+    chat_bot_flow_publisher = providers.Singleton(ChatbotFlowPublisher, connection=rabbitmq_connection)
+    test_publisher = providers.Singleton(TestPublisher, connection=rabbitmq_connection)
     
     #----- REPOSITORIES -----
-    user_repository = providers.Factory(UserRepository, session = session)
-    team_repository = providers.Factory(TeamRepository, session = session)
-    client_repository = providers.Factory(ClientRepository, session = session)
-    refresh_token_repository = providers.Factory(RefreshTokenRepository, session = session)
-    role_repository = providers.Factory(RoleRepository, session = session)
-    business_profile_repository = providers.Factory(BusinessProfileRepository, session = session)
-    tag_repository = providers.Factory(TagRepository, session = session)
-    attribute_repository = providers.Factory(AttributeRepository, session = session)
-    contact_repository = providers.Factory(ContactRepository, session = session)
-    message_repository = providers.Factory(MessageRepository, session = session)
-    template_repository = providers.Factory(TemplateRepository, session = session)
-    conversation_repository = providers.Factory(ConversationRepository, session = session)
-    assignment_repository = providers.Factory(AssignmentRepository, session = session)
-    broadcast_repository = providers.Factory(BroadcastRepository, session = session)
-    note_repository = providers.Factory(NoteRepository, session = session)
-    chat_bot_repository = providers.Factory(ChatBotRepository, session = session)
+    user_repository = providers.Factory(UserRepository, session= session)
+    team_repository = providers.Factory(TeamRepository, session= session)
+    client_repository = providers.Factory(ClientRepository, session= session)
+    refresh_token_repository = providers.Factory(RefreshTokenRepository, session= session)
+    role_repository = providers.Factory(RoleRepository, session= session)
+    business_profile_repository = providers.Factory(BusinessProfileRepository, session= session)
+    tag_repository = providers.Factory(TagRepository, session= session)
+    attribute_repository = providers.Factory(AttributeRepository, session= session)
+    contact_repository = providers.Factory(ContactRepository, session= session)
+    message_repository = providers.Factory(MessageRepository, session= session)
+    template_repository = providers.Factory(TemplateRepository, session= session)
+    conversation_repository = providers.Factory(ConversationRepository, session= session)
+    assignment_repository = providers.Factory(AssignmentRepository, session= session)
+    broadcast_repository = providers.Factory(BroadcastRepository, session= session)
+    note_repository = providers.Factory(NoteRepository, session= session)
+    chat_bot_repository = providers.Factory(ChatBotRepository, session= session)
     
     #----- SERVICES -----
     user_service = providers.Factory(UserService, repository = user_repository)
@@ -282,6 +291,7 @@ class Container(containers.DeclarativeContainer):
     broadcast_service = providers.Factory(BroadcastService, repository = broadcast_repository)
     note_service = providers.Factory(NoteService, repository = note_repository)
     chat_bot_service = providers.Factory(ChatBotService, repository = chat_bot_repository)
+    chat_bot_context_service = providers.Singleton(ChatbotContextService, redis_service = async_redis_service)
     
     #----- API -----
     business_profile_api = providers.Singleton(BusinessProfileApi, client = http_client)
@@ -392,9 +402,9 @@ class Container(containers.DeclarativeContainer):
 
     #----- RealTime -----
     template_hook = providers.Singleton(TemplateHook, template_service = template_service, client_service = client_service, business_profile_service = business_profile_service, mongo_crud = mongo_crud_template, wa_template_api = whatsapp_template_api)
-    message_hook = providers.Singleton(MessageHook, message_service = message_service,conversation_service = conversation_service, save_message = save_message_document, contact_service = contact_service, client_service = client_service, assignment_service = assignment_service,team_service = team_service, business_profile_service = business_profile_service ,message_publisher = message_publisher, media_api = whatsapp_media_api,redis_service = async_redis_service,mongo_message = mongo_crud_message,socket_message = socket_message_gateway, s3_service = s3_bucket_service, aws_s3_bucket = config.S3_BUCKET_NAME, aws_region = config.AWS_REGION)
+    message_hook = providers.Singleton(MessageHook, message_service = message_service,conversation_service = conversation_service, save_message = save_message_document, contact_service = contact_service, client_service = client_service, assignment_service = assignment_service,team_service = team_service, business_profile_service = business_profile_service ,message_publisher = message_publisher, chatbot_context_service = chat_bot_context_service, chatbot_flow_publisher = chat_bot_flow_publisher, media_api = whatsapp_media_api,redis_service = async_redis_service,mongo_message = mongo_crud_message,socket_message = socket_message_gateway, s3_service = s3_bucket_service, aws_s3_bucket = config.S3_BUCKET_NAME, aws_region = config.AWS_REGION)
     webhook_dispatcher = providers.Factory(WebhookDispatcher, message_hook = message_hook, template_hook = template_hook)
     
     #----- ChatBot -----
-    chat_bot_create_chat_bot = providers.Factory(CreateChatBot, chat_bot_service = chat_bot_service, user_service = user_service)
-    
+    chat_bot_create_chat_bot = providers.Factory(CreateChatBot, chat_bot_service = chat_bot_service, business_service = business_profile_service,whatsapp_media_api = whatsapp_media_api,s3_bucket_service = s3_bucket_service, aws_region = config.AWS_REGION, aws_s3_bucket_name = config.S3_BUCKET_NAME, mongo_crud_chat_bot = mongo_crud_chat_bot)
+    chat_bot_delete_chat_bot = providers.Factory(DeletChatBot, chat_bot_service = chat_bot_service)

@@ -1,3 +1,4 @@
+from typing import Optional
 from app.core.services.BaseService import BaseService
 from app.utils.Helper import Helper
 from app.whatsapp.team_inbox.models.Conversation import Conversation
@@ -17,5 +18,5 @@ class ConversationService(BaseService[Conversation]):
     async def find_by_contact_and_client_id(self, contact_phone_number: str, client_id: str) -> Conversation:
         return await self.repository.find_by_contact_and_client_id(str(contact_phone_number), client_id)
     
-    async def get_user_conversations(self, user_id: str, page: int = 1, limit: int = 10) -> dict:
-        return await self.repository.get_user_conversations(user_id, page, limit)
+    async def get_user_conversations(self, user_id: str, page: int = 1, limit: int = 10, search_term: Optional[str] = None) -> dict:
+        return await self.repository.get_user_conversations(user_id, page, limit, search_term)

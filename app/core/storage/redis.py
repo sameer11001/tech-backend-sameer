@@ -51,24 +51,30 @@ class RedisService:
         return msgpack.ExtType(code, data)
 
     def _key(self, key: str) -> str:
-        return f"{self.namespace}{key}"
+        ns = f"{self.namespace}:" if self.namespace and not self.namespace.endswith(":") else self.namespace
+        return f"{ns}{key}"
 
     def _serialize(self, value: Any) -> bytes:
         return msgpack.packb(value, use_bin_type=True, default=self._encode_custom)
 
-    def _deserialize(self, raw: Union[bytes, None]) -> Any:
+    def _deserialize(self, raw: Union[bytes, str, None]) -> Any:
         if raw is None:
             return None
-        try:
-            return msgpack.unpackb(raw, raw=False, ext_hook=self._decode_custom)
-        except Exception:
-            text = raw.decode(errors="ignore")
+        if isinstance(raw, (bytes, bytearray)):
             try:
-                return json.loads(text)
-            except (ValueError, TypeError):
-                return text
+                return msgpack.unpackb(raw, raw=False, ext_hook=self._decode_custom)
+            except Exception:
+                try:
+                    return raw.decode()
+                except Exception:
+                    return raw
+        if isinstance(raw, str):
+            try:
+                return json.loads(raw)
+            except Exception:
+                return raw
+        return raw
 
-    
     def set(
         self,
         key: str,
@@ -176,6 +182,17 @@ class RedisService:
         return self._client.keys(self._key(pattern))
 
 
+from datetime import datetime
+import json
+import msgpack
+from typing import Any, Dict, List, Optional, Set, Union
+import redis
+import redis.asyncio as aioredis
+from uuid import UUID as NativeUUID
+from asyncpg.pgproto.pgproto import UUID as PgUUID
+
+from app.utils.DateTimeHelper import DateTimeHelper
+
 class AsyncRedisService:
     def __init__(
         self,
@@ -218,24 +235,70 @@ class AsyncRedisService:
         return msgpack.ExtType(code, data)
 
     def _key(self, key: str) -> str:
-        return f"{self.namespace}{key}"
+        ns = f"{self.namespace}:" if self.namespace and not self.namespace.endswith(":") else self.namespace
+        return f"{ns}{key}"
 
-    def _serialize(self, value: Any) -> bytes:
-        return msgpack.packb(value, use_bin_type=True,default=self._encode_custom)
+    def _serialize(self, value: Any, use_json: bool = False) -> Union[bytes, str]:
+        if use_json:
+            return json.dumps(value, default=str)  
+        else:
+            return msgpack.packb(value, use_bin_type=True, default=self._encode_custom)
 
-    def _deserialize(self, raw: Union[bytes, None]) -> Any:
+    def _deserialize(self, raw: Union[bytes, str, None], use_json: bool = False) -> Any:
         if raw is None:
             return None
-        try:
-            return msgpack.unpackb(raw, raw=False, ext_hook=self._decode_custom)
-        except Exception:
-            text = raw.decode(errors="ignore")
-            try:
-                return json.loads(text)
-            except (ValueError, TypeError):
-                return text
+            
+        if use_json:
+            if isinstance(raw, str):
+                try:
+                    return json.loads(raw)
+                except (json.JSONDecodeError, TypeError):
+                    return raw
+            elif isinstance(raw, (bytes, bytearray)):
+                try:
+                    decoded = raw.decode('utf-8')
+                    return json.loads(decoded)
+                except (UnicodeDecodeError, json.JSONDecodeError, TypeError):
+                    return raw.decode('utf-8', errors='ignore')
+            return raw
+        else:
+            if isinstance(raw, (bytes, bytearray)):
+                try:
+                    return msgpack.unpackb(raw, raw=False, ext_hook=self._decode_custom)
+                except Exception:
+                    try:
+                        return raw.decode()
+                    except Exception:
+                        return raw
+            if isinstance(raw, str):
+                try:
+                    return json.loads(raw)
+                except Exception:
+                    return raw
+            return raw
 
-    
+    def _smart_deserialize(self, raw: Union[bytes, str, None]) -> Any:
+        if raw is None:
+            return None
+            
+        if isinstance(raw, (bytes, bytearray)):
+            try:
+                decoded_str = raw.decode('utf-8')
+                if decoded_str.isdigit() or (decoded_str.startswith('-') and decoded_str[1:].isdigit()):
+                    return int(decoded_str)
+            except (UnicodeDecodeError, ValueError):
+                pass
+        
+        try:
+            return self._deserialize(raw, use_json=False)
+        except Exception:
+            try:
+                return self._deserialize(raw, use_json=True)
+            except Exception:
+                if isinstance(raw, (bytes, bytearray)):
+                    return raw.decode('utf-8', errors='ignore')
+                return raw
+
     async def set(
         self,
         key: str,
@@ -243,83 +306,100 @@ class AsyncRedisService:
         ttl: Optional[int] = None,
         nx: bool = False,
         xx: bool = False,
+        use_json: bool = False,
     ) -> bool:
+        """
+        Set a key with optional JSON serialization.
+        
+        Args:
+            key: Redis key
+            value: Value to store
+            ttl: Time to live in seconds
+            nx: Only set if key doesn't exist
+            xx: Only set if key exists
+            use_json: Use JSON serialization instead of MessagePack
+        """
         full_key = self._key(key)
         ex = ttl if ttl is not None else self.default_ttl
-        data = self._serialize(value)
+        data = self._serialize(value, use_json=use_json)
         return await self._client.set(full_key, data, ex=ex, nx=nx, xx=xx)
 
-    
-    async def get(self, key: str) -> Any:
+    async def get(self, key: str, use_json: bool = False) -> Any:
         raw = await self._client.get(self._key(key))
-        return self._deserialize(raw)
+        return self._deserialize(raw, use_json=use_json)
 
-    
+    async def get_smart(self, key: str) -> Any:
+        raw = await self._client.get(self._key(key))
+        return self._smart_deserialize(raw)
+
     async def delete(self, *keys: str) -> int:
         full = [self._key(k) for k in keys]
         return await self._client.delete(*full)
 
-    
     async def exists(self, *keys: str) -> int:
         full = [self._key(k) for k in keys]
         return await self._client.exists(*full)
 
-    
     async def expire(self, key: str, ttl: int) -> bool:
         return await self._client.expire(self._key(key), ttl)
 
-    
     async def ttl(self, key: str) -> int:
         return await self._client.ttl(self._key(key))
 
-    
-    async def hset(self, key: str, mapping: Dict[str, Any]) -> int:
-        data = {field: self._serialize(val) for field, val in mapping.items()}
+    async def hset(self, key: str, mapping: Dict[str, Any], use_json: bool = False) -> int:
+        if use_json:
+            data = {field: self._serialize(val, use_json=True) for field, val in mapping.items()}
+        else:
+            data = {field: self._serialize(val, use_json=False) for field, val in mapping.items()}
         return await self._client.hset(self._key(key), mapping=data)
 
-    
-    async def hget(self, key: str, field: str) -> Any:
+    async def hget(self, key: str, field: str, use_json: bool = False) -> Any:
         raw = await self._client.hget(self._key(key), field)
-        return self._deserialize(raw)
+        return self._deserialize(raw, use_json=use_json)
 
-    
-    async def hgetall(self, key: str) -> Dict[str, Any]:
+    async def hgetall(self, key: str, use_json: bool = False) -> Dict[str, Any]:
         raw = await self._client.hgetall(self._key(key))
-
         cleaned: dict[str, Any] = {}
         for k, v in raw.items():
             skey = k.decode() if isinstance(k, (bytes, bytearray)) else k
-            cleaned[skey] = self._deserialize(v)
+            cleaned[skey] = self._deserialize(v, use_json=use_json)
         return cleaned
 
-    
-    async def lpush(self, key: str, *values: Any) -> int:
-        vals = [self._serialize(v) for v in values]
+    async def hgetall_smart(self, key: str) -> Dict[str, Any]:
+        raw = await self._client.hgetall(self._key(key))
+        cleaned: dict[str, Any] = {}
+        for k, v in raw.items():
+            skey = k.decode() if isinstance(k, (bytes, bytearray)) else k
+            cleaned[skey] = self._smart_deserialize(v)
+        return cleaned
+
+    async def lpush(self, key: str, *values: Any, use_json: bool = False) -> int:
+        if use_json:
+            vals = [self._serialize(v, use_json=True) for v in values]
+        else:
+            vals = [self._serialize(v, use_json=False) for v in values]
         return await self._client.lpush(self._key(key), *vals)
 
-    
-    async def rpush(self, key: str, *values: Any) -> int:
-        vals = [self._serialize(v) for v in values]
+    async def rpush(self, key: str, *values: Any, use_json: bool = False) -> int:
+        if use_json:
+            vals = [self._serialize(v, use_json=True) for v in values]
+        else:
+            vals = [self._serialize(v, use_json=False) for v in values]
         return await self._client.rpush(self._key(key), *vals)
 
-    
-    async def lrange(self, key: str, start: int, end: int) -> List[Any]:
+    async def lrange(self, key: str, start: int, end: int, use_json: bool = False) -> List[Any]:
         raw = await self._client.lrange(self._key(key), start, end)
-        return [self._deserialize(v) for v in raw]
+        return [self._deserialize(v, use_json=use_json) for v in raw]
 
-    
     async def incr(self, key: str, amount: int = 1) -> int:
         return await self._client.incrby(self._key(key), amount)
 
-    
     async def pipeline(self) -> aioredis.client.Pipeline:
         return self._client.pipeline()
 
-    
     async def flush_db(self) -> bool:
         return await self._client.flushdb()
 
-    
     async def keys(self, pattern: str) -> List[str]:
         return await self._client.keys(self._key(pattern))
 
@@ -329,32 +409,36 @@ class AsyncRedisService:
     async def get_redis(self):
         return self._client
 
-    async def sadd(self, key: str, *values: Any) -> int:
-        """Add one or more members to a set."""
-        vals = [self._serialize(v) for v in values]
+    async def sadd(self, key: str, *values: Any, use_json: bool = False) -> int:
+        if use_json:
+            vals = [self._serialize(v, use_json=True) for v in values]
+        else:
+            vals = [self._serialize(v, use_json=False) for v in values]
         return await self._client.sadd(self._key(key), *vals)
 
-    async def srem(self, key: str, *values: Any) -> int:
-        """Remove one or more members from a set."""
-        vals = [self._serialize(v) for v in values]
+    async def srem(self, key: str, *values: Any, use_json: bool = False) -> int:
+        if use_json:
+            vals = [self._serialize(v, use_json=True) for v in values]
+        else:
+            vals = [self._serialize(v, use_json=False) for v in values]
         return await self._client.srem(self._key(key), *vals)
 
-    async def smembers(self, key: str) -> Set[Any]:
-        """Get all the members in a set."""
+    async def smembers(self, key: str, use_json: bool = False) -> Set[Any]:
         raw = await self._client.smembers(self._key(key))
-        return {self._deserialize(v) for v in raw}
+        return {self._deserialize(v, use_json=use_json) for v in raw}
     
     async def scard(self, key: str) -> int:
-        """Get the number of members in a set."""
         return await self._client.scard(self._key(key))
     
-    async def xadd(self, key: str, fields: Dict[str, Any], id: str = '*', maxlen: Optional[int] = None, approximate: bool = True) -> str:
+    async def xadd(self, key: str, fields: Dict[str, Any], id: str = '*', maxlen: Optional[int] = None, approximate: bool = True, use_json: bool = False) -> str:
         if not isinstance(fields, dict) or not fields:
             raise ValueError("Fields must be a non-empty dictionary for xadd.")
+        
         serialized_fields = {}
         for k, v in fields.items():
             key_str = str(k)
-            serialized_fields[key_str] = self._serialize(v)
+            serialized_fields[key_str] = self._serialize(v, use_json=use_json)
+            
         return await self._client.xadd(
             name=self._key(key),
             fields=serialized_fields,
@@ -364,4 +448,20 @@ class AsyncRedisService:
         )
 
     async def hincrby(self, key: str, field: str, amount: int = 1) -> int:
-        return await self._client.hincrby(self._key(key), field, amount)
+        result = await self._client.hincrby(self._key(key), field, amount)
+        return result
+
+    async def hset_unread_consistent(self, key: str, mapping: Dict[str, Any]) -> int:
+
+        processed_mapping = {}
+        
+        for field, value in mapping.items():
+            if field == 'unread_count' and isinstance(value, (int, float)):
+                processed_mapping[field] = int(value)
+            else:
+                processed_mapping[field] = self._serialize(value, use_json=True)
+        
+        return await self._client.hset(self._key(key), mapping=processed_mapping)
+
+    async def hgetall_unread_consistent(self, key: str) -> Dict[str, Any]:
+        return await self.hgetall_smart(key)

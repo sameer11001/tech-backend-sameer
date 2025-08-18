@@ -1,4 +1,5 @@
 from fastapi import Depends
+
 from app.core.storage.redis import AsyncRedisService
 from app.user_management.auth.v1.schemas.dto.RoleDTO import ListBaseRole
 from app.user_management.auth.services.RoleService import RoleService
@@ -9,6 +10,7 @@ class GetRoles:
         self.role_service = role_service
         self.redis_service = redis_service
 
+    
     async def execute(self):
         if await self.redis_service.exists(RedisHelper.redis_roles()):
             roles = await self.redis_service.get(RedisHelper.redis_roles())

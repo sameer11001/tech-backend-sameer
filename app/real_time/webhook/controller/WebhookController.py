@@ -5,8 +5,7 @@ from app.core.config.container import Container
 from app.core.config.settings import settings
 from app.real_time.webhook.services.WebhookDispatcher import WebhookDispatcher
 
-router = APIRouter(prefix="/webhook")
-
+router = APIRouter()
 
 @router.get("", status_code=status.HTTP_200_OK)
 async def verify_webhook(

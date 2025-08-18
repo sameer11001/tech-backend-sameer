@@ -8,3 +8,4 @@ class Helper:
         country_code = f"+{parsed_number.country_code}"
         national_number = parsed_number.national_number
         return country_code, national_number
+    

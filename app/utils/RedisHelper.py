@@ -100,3 +100,14 @@ class RedisHelper:
     @staticmethod
     def redis_business_conversation_unread_key(conversation_id: str) -> str:
         return f"chat:conversation:{{{conversation_id}}}:unread"
+    
+    ############################################## chatbot
+    
+    @staticmethod
+    def redis_chatbot_context_key(chatbot_id: str, conversation_id: str) -> str:
+        return f"chatbot_context:{chatbot_id}:conversation:{conversation_id}"
+    
+    @staticmethod
+    def redis_chatbot_button_key(chatbot_id: str, btn_id: str) -> str:
+        return  f"chatbot:{chatbot_id}:buttons:{btn_id}"
+    

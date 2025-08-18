@@ -21,10 +21,12 @@ class AttributeService(BaseService[Attribute]):
             raise ConflictException()
         return result
     
-    async def get_by_client_id_and_search(self, client_id: str, page: int, limit: int, search: Optional[str] = None) -> dict:
+    async def get_by_client_id_and_search(
+        self, client_id: str, page: int, limit: int, query: Optional[str] = None
+    ) -> dict:
         if page < 1:
             page = 1
-        return await self.repository.get_by_client_id_and_search(client_id, page, limit, search)
+        return await self.repository.get_by_client_id_and_search(client_id, page, limit, query)
     
     async def delete_by_name_and_client_id(self, attribute_name: str, client_id: str) -> Attribute:
         return await self.repository.delete_by_name_and_client_id(attribute_name, client_id)

@@ -1,3 +1,4 @@
+
 from app.whatsapp.business_profile.external_services.BusinessProfileApi import BusinessProfileApi
 from app.core.schemas.BaseResponse import ApiResponse
 from app.user_management.user.models.Client import Client
@@ -12,6 +13,7 @@ class QueryFileUploadStatus:
         self.business_profile_api = business_profile_api
         self.user_service = user_service
 
+    
     def execute(self, user_id, upload_id):
 
         user: User = self.user_service.get(user_id)

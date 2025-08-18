@@ -3,6 +3,7 @@ from typing import Any, Dict
 from uuid import UUID
 
 from fastapi import logger
+
 from app.core.repository.MongoRepository import MongoCRUD
 from app.core.schemas.BaseResponse import ApiResponse
 from app.core.schemas.PageableResponse import PageableResponse
@@ -28,6 +29,8 @@ class GetTemplates:
     ):
         self.user_service = user_service
         self.template_mongo_crud = template_mongo_crud
+    
+    
     async def execute(self,user_id: str, page: int = 1, limit: int = 10):
 
         user: User = await self.user_service.get(user_id)

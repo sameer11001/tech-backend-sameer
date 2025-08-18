@@ -3,6 +3,7 @@
 
 
 from app.annotations.services.TagService import TagService
+
 from app.core.schemas.BaseResponse import ApiResponse
 from app.user_management.user.models.Client import Client
 from app.user_management.user.services.UserService import UserService
@@ -12,7 +13,7 @@ class UpdateTag:
     def __init__(self, tag_service: TagService, user_service: UserService):
         self.tag_service = tag_service
         self.user_service = user_service
-        
+    
     async def execute(self, user_id: str, tag_name: str, new_tag_name: str):
         
         user = await self.user_service.get(user_id)

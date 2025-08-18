@@ -20,15 +20,13 @@ from app.user_management.auth.v1.use_case.UserLogin import UserLogin
 from app.user_management.auth.v1.use_case.UserLogout import UserLogout
 from app.core.exceptions.custom_exceptions.DataBaseException import DataBaseException
 from app.core.exceptions.custom_exceptions.EntityNotFoundException import EntityNotFoundException
-from app.core.exceptions.ErrorHandler import ErrorResponse
 from app.core.exceptions.custom_exceptions.ForbiddenException import ForbiddenException
 from app.core.exceptions.GlobalException import GlobalException
 from app.core.exceptions.custom_exceptions.UnAuthorizedException import UnAuthorizedException
 from app.core.schemas.BaseResponse import ApiResponse
 from app.utils.generate_responses import generate_responses
 
-router = APIRouter(prefix="/auth")
-
+router = APIRouter()
 
 @router.get(
     "/roles",
@@ -69,7 +67,6 @@ async def login(
 ):
 
     try:
-
         return ApiResponse.success_response(
             data=await user_login.execute(
                 request, auth_login.email, auth_login.password, auth_login.client_id

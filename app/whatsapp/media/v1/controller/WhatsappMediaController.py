@@ -17,7 +17,7 @@ from app.whatsapp.media.v1.usecase.UploadMedia import UploadMedia
 from app.core.config.logger import get_logger
 
 logger = get_logger("WhatsappMediaController")
-router = APIRouter(prefix="/media")
+router = APIRouter()
 
 @router.get(
     "/download-media",

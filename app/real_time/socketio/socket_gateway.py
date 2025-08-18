@@ -180,10 +180,11 @@ class SocketMessageGateway:
             unread_key = RedisHelper.redis_business_conversation_unread_key(
                 conversation_id=str(conversation_id)
             )
-            unread_status = await self.redis.hgetall(unread_key)
-            unread_count = int(unread_status.get('unread_count', 0)) if unread_status else 0
             
-            await self.redis.hset(unread_key, mapping={'unread_count': 0, 'last_read_message_id': '0-0'})
+            unread_status = await self.redis.hgetall_unread_consistent(unread_key)
+            unread_count = self._extract_unread_count(unread_status)
+            
+            await self.redis.hset_unread_consistent(unread_key, {'unread_count': 0, 'last_read_message_id': '0-0'})
 
             await self.sio.emit('conversation_joined', {
                 'conversation_id': conversation_id,
@@ -343,7 +344,7 @@ class SocketMessageGateway:
             
             logger.debug(f"Message for stream: {message_for_stream}")
             
-            redis_stream_message_id = await self.redis.xadd(RedisHelper.redis_conversation_messages_stream_key(conversation_id), message_for_stream)
+            redis_stream_message_id = await self.redis.xadd(RedisHelper.redis_conversation_messages_stream_key(conversation_id), message_for_stream,use_json=True)
             
             logger.debug(f"Message {message.get('message_id')} added to Redis Stream with ID: {redis_stream_message_id}")
             
@@ -353,14 +354,19 @@ class SocketMessageGateway:
             
             if members_count <= 0: 
                 await self.redis.hincrby(unread_key, 'unread_count', 1)
-                await self.redis.hset(unread_key, mapping={'last_read_message_id': '0-0'})
+                await self.redis.hset_unread_consistent(unread_key, mapping={'last_read_message_id': '0-0'})
 
-            updated_unread_status = await self.redis.hgetall(unread_key)
-            updated_unread_count = int(updated_unread_status.get('unread_count', 0)) if updated_unread_status else 0            
+            updated_unread_status = await self.redis.hgetall_unread_consistent(unread_key)
+            updated_unread_count = self._extract_unread_count(updated_unread_status)      
 
             last_message_content = Helper._get_last_message_content(message_data=message)
                         
-            businees_data ={"conversation_id": str(conversation_id), "last_message_content": last_message_content, "last_message_time": f"{message.get('timestamp')}" , "unread_count": updated_unread_count}
+            businees_data ={
+                "conversation_id": str(conversation_id), 
+                "last_message_content": last_message_content, 
+                "last_message_time": f"{message.get('timestamp')}" , 
+                "unread_count": updated_unread_count
+                }
             
             await self.sio.emit(event="message_received", data=businees_data, room=phone_number_id)
             
@@ -385,6 +391,14 @@ class SocketMessageGateway:
             
         except Exception as e:
             logger.error(f"Error emitting message: {e}")
+
+    async def emit_chatbot_reply_message(self, payload: dict):
+        try:
+            business_phone_number_id = payload.get("business_data").get("business_phone_number_id")
+            await self.emit_received_message(message=payload.get("message"), phone_number_id= business_phone_number_id, conversation_id= payload.get("conversation_id"))
+        
+        except Exception as e:
+            logger.error(f"Error emitting chatbot reply message: {e}")
 
     async def emit_message_status(self, conversation_id: str, status: str, message_id: str):
         try:
@@ -478,9 +492,13 @@ class SocketMessageGateway:
         phone_number_id = await self._get_business_profile_phone_number_id(business_profile_id)
         unread_key = RedisHelper.redis_business_conversation_unread_key(conversation_id=conversation_id)
     
-        await self.redis.hset(unread_key, mapping={"unread_count": 0, "last_read_message_id": last_read_message_id})
+        await self.redis.hset_unread_consistent(unread_key, mapping={"unread_count": 0, "last_read_message_id": last_read_message_id})
     
-        data = {"conversation_id": conversation_id, "unread_count": 0, "last_read_message_id": last_read_message_id}
+        data = {
+            "conversation_id": conversation_id, 
+            "unread_count": 0, 
+            "last_read_message_id": last_read_message_id
+            }
         
         await self.sio.emit("unread_status_updated", data=data, room=phone_number_id)
         
@@ -532,6 +550,28 @@ class SocketMessageGateway:
         
         return None
     
-
-
-#TODO unread Messages implementation
+    def _extract_unread_count(self, unread_status: dict) -> int:
+        if not unread_status:
+            return 0
+        
+        unread_count_raw = unread_status.get('unread_count', 0)
+        
+        try:
+            if isinstance(unread_count_raw, int):
+                return unread_count_raw
+            elif isinstance(unread_count_raw, str):
+                if unread_count_raw.isdigit():
+                    return int(unread_count_raw)
+                elif unread_count_raw.replace('.', '', 1).isdigit():
+                    return int(float(unread_count_raw))
+                else:
+                    logger.warning(f"Invalid unread_count format: {unread_count_raw}")
+                    return 0
+            elif isinstance(unread_count_raw, (float, bytes)):
+                return int(unread_count_raw)
+            else:
+                logger.warning(f"Unexpected unread_count type: {type(unread_count_raw)} - {unread_count_raw}")
+                return 0
+        except (ValueError, TypeError) as e:
+            logger.error(f"Error converting unread_count '{unread_count_raw}' to int: {e}")
+            return 0

@@ -2,7 +2,6 @@ from typing import Optional
 from fastapi import APIRouter, Depends, File, Form, UploadFile
 from dependency_injector.wiring import Provide, inject
 
-from app.core.schemas.BaseResponse import ApiResponse
 from app.core.security.JwtUtility import get_current_user
 from app.core.config.container import Container
 from app.core.exceptions.custom_exceptions.ClientExceptionHandler import ClientException
@@ -10,31 +9,16 @@ from app.core.exceptions.custom_exceptions.DataBaseException import DataBaseExce
 from app.core.exceptions.GlobalException import GlobalException
 from app.core.exceptions.custom_exceptions.UnAuthorizedException import UnAuthorizedException
 from app.utils.generate_responses import generate_responses
-from app.whatsapp.business_profile.v1.use_case.UpdateProfilePicture import (
-    UpdateProfilePicture,
-)
-from app.whatsapp.business_profile.v1.models.schema.request.UploadFileDataRequest import (
-    UploadFileDataRequest,
-)
-from app.whatsapp.business_profile.v1.models.schema.request.UploadSessionRequest import (
-    UploadSessionRequest,
-)
-from app.whatsapp.business_profile.v1.use_case.CreateUploadSession import (
-    CreateUploadSession,
-)
 from app.whatsapp.business_profile.v1.use_case.GetBusinessProfile import (
     GetBusinessProfile,
 )
 from app.whatsapp.business_profile.v1.use_case.UpdateBusinessProfile import (
     UpdateBusinessProfile,
 )
-from app.whatsapp.business_profile.v1.use_case.UploadFileData import UploadFileData
 from app.core.config.container import Container
 from app.core.exceptions.GlobalException import GlobalException
 
-
-router = APIRouter(prefix="/business-profile")
-
+router = APIRouter()
 
 @router.get("",
             responses={**generate_responses({UnAuthorizedException,

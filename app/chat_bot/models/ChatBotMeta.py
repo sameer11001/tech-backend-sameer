@@ -10,12 +10,10 @@ class ChatBotMeta(BaseEntity, table=True):
     
     name : str = Field(nullable=False)
     language : ChatBotLanguage = Field(default=ChatBotLanguage.ENGLISH,nullable=True)
-    first_node_id : str = Field(nullable=False)
     triggered : int = Field(default=0,nullable=False)
     version : float = Field(nullable=True)
     communicate_type : CommunicateType = Field(default=CommunicateType.WHATSAPP,nullable=True)
     is_default : bool = Field(default=False,nullable=False)
-    total_nodes: int = Field(default=0, nullable=False)
     client_id: UUID = Field(default=None, foreign_key="clients.id", index=True, nullable=True)    
     
     client : Optional["Client"] = Relationship(back_populates="chatbots")

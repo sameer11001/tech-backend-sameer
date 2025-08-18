@@ -1,9 +1,46 @@
-from typing import List
+from dataclasses import dataclass
+from typing import List, Optional
+
+from pydantic import BaseModel
 
 from app.chat_bot.models.schema.interactive_body.DynamicInteractiveMessageRequest import DynamicInteractiveMessageRequest
 from app.chat_bot.models.schema.interactive_body.InteractiveActionRequest import InteractiveActionRequest
 from app.chat_bot.models.schema.interactive_body.InteractiveHeaderRequest import InteractiveHeaderRequest
 from app.utils.enums.InteractiveMessageEnum import HeaderType, InteractiveType
+
+@dataclass
+class ValidationError:
+    field: str
+    message: str
+    node_id: Optional[str] = None
+    node_name: Optional[str] = None
+    error_code: Optional[str] = None
+
+class ValidationResult(BaseModel):
+    is_valid: bool
+    errors: List[ValidationError]
+    warnings: List[ValidationError] = []
+    
+    def add_error(self, field: str, message: str, node_id: str = None, 
+                  node_name: str = None, error_code: str = None):
+        self.errors.append(ValidationError(
+            field=field, 
+            message=message, 
+            node_id=node_id, 
+            node_name=node_name,
+            error_code=error_code
+        ))
+        self.is_valid = False
+    
+    def add_warning(self, field: str, message: str, node_id: str = None, 
+                    node_name: str = None, error_code: str = None):
+        self.warnings.append(ValidationError(
+            field=field, 
+            message=message, 
+            node_id=node_id, 
+            node_name=node_name,
+            error_code=error_code
+        ))
 
 class InteractiveMessageValidator:
     WHATSAPP_LIMITS = {

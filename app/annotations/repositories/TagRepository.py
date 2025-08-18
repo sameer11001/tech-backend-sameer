@@ -61,14 +61,16 @@ class TagRepository(BaseRepository[Tag]):
             if query_str:
                 base_query = base_query.where(Tag.name.ilike(f"%{query_str}%"))
             
-            total_count = (await self.session.execute(
-                select(func.count()).select_from(base_query)
-            )).scalar()
+            count_query = select(func.count()).select_from(base_query.subquery())
+            total_result = await self.session.exec(count_query)
+            total_count = total_result.first()
             
-            tags = (await self.session.execute(
+            tags_result = await self.session.exec(
                 base_query.offset((page - 1) * limit).limit(limit)
-            )).scalars().all()
+            )
             
+            tags = tags_result.unique().all()
+ 
             return {"tags": tags, "total_count": total_count}
         except SQLAlchemyError as e:
             await self.session.rollback()

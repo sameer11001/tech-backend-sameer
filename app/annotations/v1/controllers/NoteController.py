@@ -23,9 +23,8 @@ from app.annotations.v1.use_case.GetAttributes import GetAttributes
 from app.annotations.v1.use_case.UpdateAttribute import UpdateAttribute
 from app.utils.generate_responses import generate_responses
 
+router = APIRouter()
 
-router = APIRouter(prefix="/notes")
-    
 @router.get("/{contact_id}",
             responses = {**generate_responses([],default_exception=True)},
             status_code=status.HTTP_200_OK)

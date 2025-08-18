@@ -1,4 +1,5 @@
 from typing import List
+
 from app.core.exceptions.custom_exceptions.BadRequestException import BadRequestException
 from app.user_management.user.models.Team import Team
 from app.user_management.user.models.User import User
@@ -13,7 +14,7 @@ class EditTeam:
         self.team_service = team_service
         self.user_service = user_service
         
-
+    
     async def execute(self, user_id: str, team_id: str, update_data_body: EditTeamRequest):
 
         team: Team = await self.team_service.get(team_id)

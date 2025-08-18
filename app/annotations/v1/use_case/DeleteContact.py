@@ -1,5 +1,6 @@
 from app.annotations.models.Contact import Contact
 from app.annotations.services.ContactService import ContactService
+
 from app.core.exceptions.custom_exceptions.BadRequestException import BadRequestException
 from app.user_management.user.models.Client import Client
 from app.user_management.user.models.User import User
@@ -11,6 +12,7 @@ class DeleteContact:
         self.contact_service = contact_service
         self.user_service = user_service
         
+    
     async def execute(self, user_id: str, contact_id: str):
         
         user: User = await self.user_service.get(user_id)

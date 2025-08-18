@@ -1,4 +1,4 @@
-from typing import Optional
+from typing import List, Optional
 from fastapi import logger
 from sqlmodel import Session, delete, func, select
 from app.annotations.models.Contact import Contact
@@ -42,16 +42,21 @@ class ContactRepository(BaseRepository[Contact]):
     
         return {"contacts": contacts.unique().all(), "total_count": total_count.first()}
 
-    async def updateContractAttributes(self, contact_id: str, attribute: ContactAttributeLink):
+    async def updateContactAttribute(
+        self,contact_id: str, attributes: List[ContactAttributeLink]
+    ):
         try:
-            self.session.add(attribute)
+            await self.session.exec(
+                delete(ContactAttributeLink).where(ContactAttributeLink.contact_id == contact_id)
+            )
+            self.session.add_all(attributes)
             await self.session.flush()
-
             await self.session.commit()
+            
         except SQLAlchemyError as e:
             await self.session.rollback()
             raise DataBaseException(message=str(e))
-        
+
     async def updateContactTags(self, contact_id: str, tags: list[ContactTagLink]):
         try:
             await self.session.exec(
@@ -65,6 +70,7 @@ class ContactRepository(BaseRepository[Contact]):
         except SQLAlchemyError as e:
             await self.session.rollback()
             raise DataBaseException(message=str(e))
+        
     async def get_by_client_id_phone_number(self, client_id: str, phone_number: str) -> Contact:
         try:
             query = select(Contact).where(

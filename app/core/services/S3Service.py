@@ -7,7 +7,7 @@ from boto3.s3.transfer import TransferConfig
 
 class S3Service:
 
-    def __init__(self, s3_client, bucket_name: str,transfer_config: TransferConfig, aws_region:str, aws_s3_bucket_name:str, tmp_dir: str = "./tmp"):
+    def __init__(self, s3_client , bucket_name: str,transfer_config: TransferConfig, aws_region:str, aws_s3_bucket_name:str, tmp_dir: str = "./tmp"):
         self.s3_client  = s3_client
         self.bucket = bucket_name
         self.aws_region = aws_region

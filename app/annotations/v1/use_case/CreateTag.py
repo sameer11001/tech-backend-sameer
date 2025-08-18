@@ -4,6 +4,7 @@ from app.annotations.models.ContactTagLink import ContactTagLink
 from app.annotations.models.Tag import Tag
 from app.annotations.services.ContactService import ContactService
 from app.annotations.services.TagService import TagService
+
 from app.core.exceptions.custom_exceptions.ConflictException import ConflictException
 from app.core.schemas.BaseResponse import ApiResponse
 from app.user_management.user.models.Client import Client
@@ -20,7 +21,7 @@ class CreateTag:
         self.tag_service = tag_service
         self.user_service = user_service
         self.contact_service = contact_service
-
+    
     async def execute(self, user_id: str, tag_name: str, contact_id: Optional[UUID] = None):
 
         user = await self.user_service.get(user_id)

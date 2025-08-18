@@ -1,6 +1,7 @@
 from typing import Any, Dict, List
 from app.annotations.models.Contact import Contact
 from app.annotations.services.ContactService import ContactService
+
 from app.core.exceptions.custom_exceptions.AlreadyExistException import AlreadyExistException
 from app.core.exceptions.custom_exceptions.EntityNotFoundException import EntityNotFoundException
 from app.core.repository.MongoRepository import MongoCRUD
@@ -57,7 +58,8 @@ class CreateNewConversation:
         self.mongo_crud = mongo_crud
         self.mongo_template = mongo_template
         self.redis_service = redis_service
-        
+      
+      
     async def excute(self, user_id: str ,request_body:CreateConversationRequest ):
         
         user: User = await self.user_service.get(user_id)

@@ -1,3 +1,4 @@
+
 from app.core.exceptions.custom_exceptions.BadRequestException import BadRequestException
 from app.core.exceptions.custom_exceptions.EntityNotFoundException import EntityNotFoundException
 from app.core.schemas.BaseResponse import ApiResponse
@@ -12,6 +13,7 @@ class UpdateConversationStatus:
         self.conversation_service = conversation_service
         self.socket_gateway = socket_gateway
 
+    
     async def execute(self,user_id: str, conversation_id: str, status: ConversationStatus):
         
         conversation : Conversation = await self.conversation_service.get(conversation_id)

@@ -2,6 +2,7 @@ from datetime import datetime, timezone
 from typing import Any, Dict, Optional
 from app.annotations.services.ContactService import ContactService
 from app.core.config.logger import get_logger
+
 from app.core.exceptions.custom_exceptions.EntityNotFoundException import EntityNotFoundException
 from app.core.repository.MongoRepository import MongoCRUD
 from app.core.schemas.BaseResponse import ApiResponse
@@ -40,7 +41,8 @@ class LocationMessage:
         self.message_service = message_service
         self.mongo_crud = mongo_crud
         self.conversation_service = conversation_service
-        
+ 
+           
     async def execute(self, user_id: str, request_body:LocationMessageRequest):
         
         user:User = await self.user_service.get(user_id)

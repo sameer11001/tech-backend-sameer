@@ -1,3 +1,4 @@
+
 import phonenumbers
 from app.annotations.models.Contact import Contact
 from app.annotations.models.ContactAttributeLink import ContactAttributeLink
@@ -18,7 +19,7 @@ class UpdateContact:
         self.tag_service = tag_service
         self.contact_service = contact_service
         self.user_service = user_service
-        
+    
     async def execute(self, user_id: str, body: UpdateContactsRequest):
         user: User = await self.user_service.get(user_id)
         client: Client = user.client
@@ -52,7 +53,7 @@ class UpdateContact:
         contact.allow_sms = body.allow_sms
         
         await self.contact_service.updateContactTags(contact.id, tag_links)
-        await self.contact_service.updateContractAttributes(contact.id, attribute_links)
+        await self.contact_service.updateContactAttributes(contact.id,attribute_links)
         
         await self.contact_service.update(contact.id,contact.model_dump(exclude_unset=True))
         return {"message": "Contact updated successfully"}

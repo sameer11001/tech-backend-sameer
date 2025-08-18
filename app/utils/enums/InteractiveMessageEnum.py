@@ -12,6 +12,4 @@ class ButtonType(str, Enum):
 
 class HeaderType(str, Enum):
     TEXT = "text"
-    IMAGE = "image"
-    VIDEO = "video"
-    DOCUMENT = "document"
+    MEDIA = "media"

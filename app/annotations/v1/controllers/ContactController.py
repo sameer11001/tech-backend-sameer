@@ -14,8 +14,7 @@ from app.core.schemas.BaseResponse import ApiResponse
 from app.core.security.JwtUtility import get_current_user
 from app.utils.enums.SortBy import SortBy
 
-
-router = APIRouter(prefix="/contact")
+router = APIRouter()
 
 @router.get("/")
 @inject

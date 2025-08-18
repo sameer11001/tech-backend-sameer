@@ -1,5 +1,6 @@
 from fastapi import logger
 import orjson
+
 from app.core.decorators.log_decorator import log_class_methods
 from app.core.exceptions.custom_exceptions.BadRequestException import BadRequestException
 from app.core.schemas.BaseResponse import ApiResponse
@@ -35,6 +36,8 @@ class CreateTemplate:
         self.template_service = template_service
         self.business_profile_service = business_profile_service
         self.mongo_crud = mongo_crud
+    
+    
     async def execute(self, user_id: str, template_request: DynamicTemplateRequest):
         
         validation_errors = TemplateValidator.validate_template(template_request)

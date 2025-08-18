@@ -1,3 +1,4 @@
+
 from app.core.schemas.BaseResponse import ApiResponse
 from app.user_management.user.models.Client import Client
 from app.user_management.user.models.User import User
@@ -18,6 +19,7 @@ class CreateSession:
         self.user_service = user_service
         self.business_profile_service = business_profile_service
 
+    
     async def execute(
         self,
         user_id: str,

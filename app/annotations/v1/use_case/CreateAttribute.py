@@ -2,6 +2,7 @@ from typing import Optional
 from uuid import UUID
 from app.annotations.models.ContactAttributeLink import ContactAttributeLink
 from app.annotations.services.ContactService import ContactService
+
 from app.core.exceptions.custom_exceptions.ConflictException import ConflictException
 from app.core.schemas.BaseResponse import ApiResponse
 from app.annotations.models.Attribute import Attribute

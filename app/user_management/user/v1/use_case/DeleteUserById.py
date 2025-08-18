@@ -1,5 +1,6 @@
 from fastapi import Depends
 
+
 from app.core.exceptions.custom_exceptions.ForbiddenException import ForbiddenException
 from app.core.storage.redis import AsyncRedisService
 from app.user_management.user.models.User import User
@@ -11,7 +12,7 @@ class DeleteUserById:
     def __init__(self, user_service: UserService,redis_service: AsyncRedisService) -> None:
         self.user_service = user_service
         self.redis = redis_service
-
+    
     async def execute(self, acting_user_id: str, user_id: str):
         user: User = await self.user_service.get(user_id)
         acting_user: User = await self.user_service.get(acting_user_id)

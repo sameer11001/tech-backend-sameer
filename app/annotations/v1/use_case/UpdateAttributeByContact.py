@@ -1,3 +1,4 @@
+
 from app.core.schemas.BaseResponse import ApiResponse
 from app.annotations.models.Attribute import Attribute
 from app.annotations.services.AttributeService import AttributeService
@@ -9,7 +10,7 @@ class UpdateAttributeByContact:
     def __init__(self, attribute_service: AttributeService, user_service: UserService):
         self.attribute_service = attribute_service
         self.user_service = user_service
-        
+      
     async def execute(self, user_id: str, attribute_name: str, new_attribute_value: str, contact_id: str):
         user = await self.user_service.get(user_id)
         client: Client = user.client

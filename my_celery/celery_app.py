@@ -18,6 +18,8 @@ celery_app.conf.update(
     task_default_exchange="direct",
     task_routes=celery_config.TASK_ROUTES,
     task_create_missing_queues=True,
+    timezone="UTC",
+    enable_utc=True,
     task_reject_on_worker_lost=True,
     task_ignore_result=True,
     worker_hijack_root_logger=False,

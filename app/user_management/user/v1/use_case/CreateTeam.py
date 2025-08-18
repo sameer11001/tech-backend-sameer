@@ -1,3 +1,4 @@
+
 from app.core.exceptions.custom_exceptions.AlreadyExistException import AlreadyExistException
 from app.user_management.user.models.Team import Team
 from app.user_management.user.services.TeamService import TeamService
@@ -8,6 +9,7 @@ class CreateTeam:
         self.team_service = team_service
         self.user_service = user_service
 
+    
     async def execute(self, user_id: str, team_name: str):
 
         user = await self.user_service.get(user_id)        

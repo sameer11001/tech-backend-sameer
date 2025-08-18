@@ -1,4 +1,5 @@
 import json
+
 from app.core.repository.MongoRepository import MongoCRUD
 from app.core.schemas.BaseResponse import ApiResponse
 from app.real_time.socketio.socket_gateway import SocketMessageGateway
@@ -29,7 +30,7 @@ class AssignedUserToConversation:
         self.assignment_service = assignment_service
         self.socket_gateway = socket_gateway
         
-    
+        
     async def execute(self, assigned_by: str, assigned_to: str,conversation_id: str):
         
         user : User = await self.user_service.get(assigned_by)
@@ -42,9 +43,8 @@ class AssignedUserToConversation:
         if not conversation:
             raise EntityNotFoundException("Conversation not found")
         
-        assignment: Assignment
         if conversation.assignment_id:            
-            assignment = await self.assignment_service.get(conversation.assignment_id)
+            assignment : Assignment = await self.assignment_service.get(conversation.assignment_id)
         else:                                     
             assignment = Assignment(
                 user_id=None,

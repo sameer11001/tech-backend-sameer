@@ -1,3 +1,4 @@
+
 from app.utils.encryption import get_hash
 from app.user_management.auth.services.RoleService import RoleService
 from app.user_management.user.models.User import User
@@ -17,6 +18,7 @@ class CreateUser:
         self.team_service: TeamService = team_service
         self.role_service: RoleService = role_service
 
+    
     async def execute(self, user_id: str, user_create: UserCreateRequest):
         user: User = await self.user_service.get(user_id)
         client_id = user.client_id

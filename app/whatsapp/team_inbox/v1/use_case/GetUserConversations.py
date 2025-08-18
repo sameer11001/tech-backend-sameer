@@ -1,5 +1,8 @@
+from typing import Optional
+from app.annotations.models.Contact import Contact
 from app.annotations.services.ContactService import ContactService
 from app.core.config.logger import get_logger
+
 from app.core.exceptions.custom_exceptions.EntityNotFoundException import EntityNotFoundException
 from app.core.schemas.PageableResponse import PageableResponse
 from app.core.storage.redis import AsyncRedisService
@@ -19,16 +22,18 @@ class GetUserConversations:
         self.contact_service = contact_service
         self.message_service = message_service
         self.redis = redis
-    async def excute(self, user_id: str, page: int = 1, limit: int = 10)-> PageableResponse[Conversation]:
+    
+    
+    async def excute(self, user_id: str, page: int = 1, limit: int = 10, search_term: Optional[str] = None)-> PageableResponse[Conversation]:
         user = await self.user_service.get(user_id)
         if not user:
             raise EntityNotFoundException("User not found")
         
-        conversations : Conversation = await self.conversation_service.get_user_conversations(user_id, page, limit)
+        conversations : Conversation = await self.conversation_service.get_user_conversations(user_id, page, limit, search_term)
         logger.info(conversations)
         conversations_data = []        
         for conversation in conversations['data']:
-            contact = await self.contact_service.get(conversation.contact_id)
+            contact : Contact = await self.contact_service.get(conversation.contact_id)
             
             redis_key = RedisHelper.redis_conversation_last_message_key(conversation.id)
             
@@ -44,9 +49,11 @@ class GetUserConversations:
             assignments = conversation.assignment
             
             unread_key = RedisHelper.redis_business_conversation_unread_key(conversation_id= conversation.id)
-            unread_status = await self.redis.hgetall(unread_key)
-            unread_count = int(unread_status.get('unread_count', 0)) if unread_status else 0   
+            unread_status = await self.redis.hgetall_unread_consistent(unread_key)
+            unread_count = self._extract_unread_count(unread_status)
+            
             logger.debug(f"user_id:assignments:{assignments} {conversation.id}")
+            
             conversations_data.append(ConversationWithContact(
                 id=conversation.id,
                 status=conversation.status,
@@ -65,5 +72,30 @@ class GetUserConversations:
         
         return PageableResponse[ConversationWithContact](data = conversations_data, meta = conversations['meta'])
     
-
+    def _extract_unread_count(self, unread_status: dict) -> int:
+        if not unread_status:
+            return 0
+        
+        unread_count_raw = unread_status.get('unread_count', 0)
+        
+        try:
+            if isinstance(unread_count_raw, int):
+                return unread_count_raw
+            elif isinstance(unread_count_raw, str):
+                if unread_count_raw.isdigit():
+                    return int(unread_count_raw)
+                elif unread_count_raw.replace('.', '', 1).isdigit():
+                    return int(float(unread_count_raw))
+                else:
+                    logger.warning(f"Invalid unread_count format: {unread_count_raw}")
+                    return 0
+            elif isinstance(unread_count_raw, (float, bytes)):
+                return int(unread_count_raw)
+            else:
+                logger.warning(f"Unexpected unread_count type: {type(unread_count_raw)} - {unread_count_raw}")
+                return 0
+        except (ValueError, TypeError) as e:
+            logger.error(f"Error converting unread_count '{unread_count_raw}' to int: {e}")
+            return 0
+        
 #TODO think about the last message and how much ttl need to be in redis

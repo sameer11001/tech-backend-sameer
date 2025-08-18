@@ -1,4 +1,5 @@
 from fastapi import Depends
+
 from app.core.exceptions.custom_exceptions.ForbiddenException import ForbiddenException
 from app.user_management.auth.services.RefreshTokenService import RefreshTokenService
 from app.user_management.user.models.User import User
@@ -13,6 +14,7 @@ class ForceLogoutByAdmin:
         self.user_service = user_service
         self.refresh_token_service = refresh_token_service
 
+    
     async def execute(self, acting_user_id: str, user_id: str):
 
         user: User = await self.user_service.get(user_id)

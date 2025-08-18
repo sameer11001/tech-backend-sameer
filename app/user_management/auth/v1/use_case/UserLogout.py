@@ -1,5 +1,6 @@
 from fastapi import Depends, Request
 
+
 from app.user_management.auth.models.RefreshToken import RefreshToken
 from app.user_management.auth.v1.schemas.request.RefreshTokenUpdate import RefreshTokenUpdate
 from app.user_management.auth.services.RefreshTokenService import RefreshTokenService
@@ -12,6 +13,7 @@ class UserLogout:
     def __init__(self, refresh_token_service: RefreshTokenService):
         self.refresh_token_service: RefreshTokenService = refresh_token_service
 
+    
     async def execute(self, request: Request):
         token = request.session.get(SessionEnum.REFRESH_TOKEN.value)
         

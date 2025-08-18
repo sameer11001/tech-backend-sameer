@@ -1,6 +1,7 @@
 from typing import Any, Dict, Optional
 from app.annotations.services.ContactService import ContactService
 from app.core.config.logger import get_logger
+
 from app.core.exceptions.custom_exceptions.EntityNotFoundException import EntityNotFoundException
 from app.core.repository.MongoRepository import MongoCRUD
 from app.core.schemas.BaseResponse import ApiResponse
@@ -39,7 +40,8 @@ class TextMessage:
         self.message_service = message_service
         self.conversation_service = conversation_service
         self.contact_service = contact_service
-        
+
+            
     async def execute(self, user_id: str,
                         message_body: str,
                         recipient_number: str,

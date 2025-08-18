@@ -17,7 +17,7 @@ from app.whatsapp.team_inbox.v1.use_case.MediaMessage import MediaMessage
 from app.whatsapp.team_inbox.v1.use_case.ReplyWithReactionMessage import ReplyWithReactionMessage
 from app.whatsapp.team_inbox.v1.use_case.TextMessage import TextMessage
 
-router = APIRouter(prefix="/message")
+router = APIRouter()
 
 @router.get("/get_by_conversation")
 @inject
