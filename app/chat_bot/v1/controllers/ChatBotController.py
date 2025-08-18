@@ -30,7 +30,7 @@ async def parse_msgpack_body(request_body: Request) -> DynamicChatBotRequest:
     
 
 @router.post(
-    "/",
+    "/add_flow_node",
     responses={
         **generate_responses(
             [UnAuthorizedException, DataBaseException, ClientException]
