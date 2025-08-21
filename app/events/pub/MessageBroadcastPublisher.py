@@ -1,5 +1,4 @@
 import asyncio
-from typing import Any
 import uuid6
 from aio_pika import ExchangeType, Message, RobustConnection
 from aio_pika.pool import Pool

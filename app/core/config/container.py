@@ -167,7 +167,8 @@ class Container(containers.DeclarativeContainer):
     
     socket_redis_manager = providers.Singleton(
         AsyncRedisManager,
-        url = config.CACHE_URL
+        url = config.CACHE_URL,
+        write_only=False,
     )
     
     #----- socket -----
@@ -176,9 +177,13 @@ class Container(containers.DeclarativeContainer):
         async_mode="asgi",
         client_manager=socket_redis_manager,
         cors_allowed_origins=["http://localhost:4200"],
-        transports=['websocket'],
-        logger=True,    
-        engineio_logger=True,
+        transports=['websocket', 'polling'], 
+        
+        logger=False, 
+        engineio_logger=False, 
+        
+        ping_timeout=60,
+        ping_interval=25,        
     )
     
     #----- AWS Config -----
@@ -249,14 +254,15 @@ class Container(containers.DeclarativeContainer):
     )
     
     async_redis_service = providers.Resource(
-    AsyncRedisService,
-    host=config.REDIS_HOST,
-    port=config.REDIS_PORT,
-    db=config.REDIS_DB,
-    password=None,
-    namespace="",
-    default_ttl=config.REDIS_TTL,
-    use_msgpack=True,
+        AsyncRedisService,
+        host=config.REDIS_HOST,
+        port=config.REDIS_PORT,
+        db=config.REDIS_DB,
+        password=None,
+        namespace="",
+        default_ttl=config.REDIS_TTL,
+        use_msgpack=True,
+        
     )
     
     #----- pub/sub -----

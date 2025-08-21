@@ -32,6 +32,9 @@ class ContextLogger:
                 kwargs['context'] = context
         return message, kwargs
 
+    def bind(self, **kwargs) -> 'ContextLogger':
+        return self.with_context(**kwargs)
+
     # Sync methods
     def debug(self, message: str, context=None, **kwargs):
         message, final_kwargs = self._handle_args(message, context, **kwargs)

@@ -2,6 +2,7 @@ from pydantic_settings import BaseSettings
 from pydantic import Field
 
 class Settings(BaseSettings):
+    APP_PROFILE : str
     # AWS
     AWS_ACCESS_KEY_ID: str
     AWS_SECRET_ACCESS_KEY: str

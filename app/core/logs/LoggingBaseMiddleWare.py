@@ -63,6 +63,9 @@ class LoggingMiddleware(BaseHTTPMiddleware):
         path = request.url.path
         method = request.method
         
+        if request.url.path.startswith('/socket.io/'):
+            return await call_next(request)
+        
         if not self.should_log_request(path, method):
             return await call_next(request)
         

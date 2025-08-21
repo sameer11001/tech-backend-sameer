@@ -1,3 +1,6 @@
+from datetime import datetime
+import uuid
+from sqlmodel import SQLModel
 import logging, sys, orjson, structlog
 from structlog.contextvars import merge_contextvars
 from structlog.processors import (
@@ -98,7 +101,15 @@ def configure_structlog(*, debug: bool = False, service_name: str = "whatsapp-se
             if 'event' in event_dict:
                 event_dict['message'] = event_dict.pop('event')
             
-            return orjson.dumps(event_dict).decode('utf-8')
+            def default_serializer(obj):
+                from sqlmodel import SQLModel
+                if isinstance(obj, SQLModel):
+                    return obj.model_dump()
+                if isinstance(obj, (uuid.UUID, type)):
+                    return str(obj)
+                return str(obj)  
+
+            return orjson.dumps(event_dict, default=default_serializer).decode("utf-8")
 
         processors.append(custom_json_renderer)
         logger_factory = PrintLoggerFactory()  
@@ -118,8 +129,8 @@ def configure_structlog(*, debug: bool = False, service_name: str = "whatsapp-se
     if not debug:
         logging.getLogger("httpx").setLevel(logging.WARNING)
         logging.getLogger("httpcore").setLevel(logging.WARNING)
-        logging.getLogger("socketio").setLevel(logging.WARNING)
-        logging.getLogger("engineio").setLevel(logging.WARNING)
+        logging.getLogger("socketio").setLevel(logging.ERROR)
+        logging.getLogger("engineio").setLevel(logging.ERROR)
         logging.getLogger("pymongo").setLevel(logging.WARNING)
         logging.getLogger("pymongo.topology").setLevel(logging.WARNING)
         logging.getLogger("pymongo.serverSelection").setLevel(logging.WARNING)

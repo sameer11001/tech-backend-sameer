@@ -364,7 +364,7 @@ class MessageHook:
             )
         # create assignment
         assign = await self.assignment_service.create(
-            Assignment(user_id="01988c54-2284-7ff6-b553-c4b505d88565", assigned_by="01988c54-2284-7ff6-b553-c4b505d88565")
+            Assignment(user_id="0198cd65-dba6-7b01-9720-7be6355d1793", assigned_by="0198cd65-dba6-7b01-9720-7be6355d1793")
         )
         
         default_team: Team = await self.team_service.get_default_team_by_client_id(client.id)

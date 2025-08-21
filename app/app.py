@@ -14,7 +14,7 @@ from app.events.app_events_route import rabbitmq_router
 from app.router_v1 import api_router_v1
 
 configure_structlog(
-    debug=True,
+    debug=settings.APP_PROFILE,
     service_name="whatsapp-service"
 )
 
@@ -52,7 +52,7 @@ fastapi.add_middleware(
     allow_headers=["*"],
 )
 
-fastapi.add_middleware(LoggingMiddleware,system_log_service=container.system_log_service)
+fastapi.add_middleware(LoggingMiddleware,system_log_service=container.system_log_service, log_level=settings.APP_PROFILE)
 
 fastapi.add_exception_handler(HTTPException, error_handler.handle_http_exception)
 fastapi.add_exception_handler(GlobalException, error_handler.handle_global_exception)
