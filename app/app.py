@@ -14,7 +14,7 @@ from app.events.app_events_route import rabbitmq_router
 from app.router_v1 import api_router_v1
 
 configure_structlog(
-    debug=settings.APP_PROFILE,
+    debug= settings.APP_PROFILE == "DEBUG" if True  else False,
     service_name="whatsapp-service"
 )
 

@@ -48,12 +48,26 @@ class BaseRepository(Generic[T]):
                 if not obj:
                     raise EntityNotFoundException()
                 
-                if not isinstance(data, dict) and hasattr(data, "__dict__"):
-                    data = {k: v for k, v in data.__dict__.items() if k != "_sa_instance_state"}
+                if not isinstance(data, dict):
+                    if hasattr(data, "model_dump"):
+                        # Pydantic model
+                        data_dict = data.model_dump(exclude_unset=True, exclude_none=True)
+                    elif hasattr(data, "__dict__"):
+                        # Regular object
+                        data_dict = {k: v for k, v in data.__dict__.items() 
+                                   if not k.startswith('_') and v is not None}
+                    else:
+                        raise ValueError(f"Unsupported data type: {type(data)}")
+                else:
+                    data_dict = data
 
-                for key, value in data.items():
-                    if value is not None:
-                        setattr(obj, key, value)
+                for key, value in data_dict.items():
+                    if hasattr(obj, key) and value is not None:
+                        current_value = getattr(obj, key)
+                        if current_value != value:
+                            setattr(obj, key, value)
+
+                obj = await db_session.merge(obj)
 
                 if commit:
                     await db_session.commit()

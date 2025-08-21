@@ -18,22 +18,6 @@ from app.utils.generate_responses import generate_responses
 
 router = APIRouter()
 
-        
-async def parse_msgpack_body(request_body: Request):
-    raw_body = await request_body.body()
-    logger.debug(raw_body)
-    try:
-        json_dict = json.loads(raw_body)
-        
-        ordered_bytes = bytes(json_dict[str(i)] for i in range(len(json_dict)))
-        
-        decoded = msgspec.msgpack.decode(ordered_bytes) 
-        return DynamicChatBotRequest(**decoded)
-    except Exception as e:
-        logger.error(e)
-        raise ClientException(str(e))
-    
-
 @router.post(
     "/add_flow_node",
     responses={
@@ -44,7 +28,7 @@ async def parse_msgpack_body(request_body: Request):
 )
 @inject
 async def add_chat_bot_flow_node(
-    request_body: DynamicChatBotRequest = Depends(parse_msgpack_body),
+    request_body: DynamicChatBotRequest,
     add_flow_node: AddFlowNode = Depends(Provide[Container.chat_bot_add_flow_node]),
     token: dict = Depends(get_current_user),
 ):

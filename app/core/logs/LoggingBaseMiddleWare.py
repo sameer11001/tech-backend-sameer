@@ -47,7 +47,6 @@ class LoggingMiddleware(BaseHTTPMiddleware):
         return self.log_level == "DEBUG"
 
     def should_log_response(self, path: str, status_code: int, duration_ms: int) -> bool:
-        # Always log errors
         if status_code >= 400:
             return True
             
@@ -59,75 +58,74 @@ class LoggingMiddleware(BaseHTTPMiddleware):
             
         return self.log_level == "DEBUG"
 
-    async def dispatch(self, request: Request, call_next) -> Response:
-        path = request.url.path
-        method = request.method
-        
-        if request.url.path.startswith('/socket.io/'):
-            return await call_next(request)
-        
-        if not self.should_log_request(path, method):
-            return await call_next(request)
-        
-        start_time = time.perf_counter()
-        client_ip = self._get_client_ip(request)
+    async def dispatch(self, request: Request, call_next):
+        start_time = time.time()
         
         try:
-            if self.log_level == "DEBUG":
-                await self.logger.adebug("request_start",
-                    method=method,
-                    path=path,
-                    client=client_ip,
-                    request_id=getattr(request.state, "request_id", None)
-                )
-
             response = await call_next(request)
+            duration_ms = (time.time() - start_time) * 1000
             
-            duration_ms = int((time.perf_counter() - start_time) * 1000)
-            
-            if self.should_log_response(path, response.status_code, duration_ms):
-                log_level = "warning" if response.status_code >= 400 else "info"
-                log_method = getattr(self.logger, f"a{log_level}")
+            try:
+                if hasattr(self.system_log_service, 'log_business_event'):
+                    log_service = self.system_log_service
+                else:
+                    log_service = self.system_log_service()
                 
-                await log_method(f"request_{log_level}",
-                    method=method,
-                    path=path,
-                    status=response.status_code,
-                    duration_ms=duration_ms,
-                    client=client_ip,
-                    request_id=getattr(request.state, "request_id", None)
+                await log_service.log_business_event(
+                    event_type="http_request",
+                    message=f"{request.method} {request.url.path} - {response.status_code} ({round(duration_ms, 2)}ms)",
+                    level="info",
+                    user_id=getattr(request.state, 'user_id', None) if hasattr(request, 'state') else None,
+                    request_id=getattr(request.state, 'request_id', None) if hasattr(request, 'state') else request.headers.get("X-Request-ID"),
+                    correlation_id=getattr(request.state, 'correlation_id', None) if hasattr(request, 'state') else request.headers.get("X-Correlation-ID"),
+                    context={
+                        "method": request.method,
+                        "path": str(request.url.path),
+                        "status_code": response.status_code,
+                        "duration_ms": round(duration_ms, 2),
+                        "client_ip": request.client.host if request.client else None,
+                        "user_agent": request.headers.get("user-agent"),
+                        "query_params": dict(request.query_params) if request.query_params else None,
+                        "content_type": request.headers.get("content-type")
+                    }
                 )
                 
-                if self.system_log_service and duration_ms > 2000: 
-                    await self.system_log_service.log_business_event(
-                        event_type="slow_request",
-                        message=f"Slow request detected: {method} {path}",
-                        level=LogLevel.WARN,
-                        context={
-                            "duration_ms": duration_ms,
-                            "method": method,
-                            "path": path,
-                            "status_code": response.status_code,
-                            "client_ip": client_ip
-                        }
-                    )
-
+            except Exception as log_error:
+                print(f"Failed to log request: {log_error}") 
+            
             return response
-
+            
         except Exception as e:
-            duration_ms = int((time.perf_counter() - start_time) * 1000)
+            duration_ms = (time.time() - start_time) * 1000
             
-            await self.logger.aerror("request_failed",
-                method=method,
-                path=path,
-                error=str(e),
-                duration_ms=duration_ms,
-                client=client_ip,
-                exception=type(e).__name__,
-                request_id=getattr(request.state, "request_id", None)
-            )
+            try:
+                if hasattr(self.system_log_service, 'log_business_event'):
+                    log_service = self.system_log_service
+                else:
+                    log_service = self.system_log_service()
+                
+                await log_service.log_business_event(
+                    event_type="http_error",
+                    message=f"HTTP Error: {request.method} {request.url.path} - {type(e).__name__}: {str(e)}",
+                    level="error",
+                    user_id=getattr(request.state, 'user_id', None) if hasattr(request, 'state') else None,
+                    request_id=getattr(request.state, 'request_id', None) if hasattr(request, 'state') else request.headers.get("X-Request-ID"),
+                    correlation_id=getattr(request.state, 'correlation_id', None) if hasattr(request, 'state') else request.headers.get("X-Correlation-ID"),
+                    context={
+                        "method": request.method,
+                        "path": str(request.url.path),
+                        "error": str(e),
+                        "error_type": type(e).__name__,
+                        "duration_ms": round(duration_ms, 2),
+                        "client_ip": request.client.host if request.client else None,
+                        "user_agent": request.headers.get("user-agent")
+                    }
+                )
+                
+            except Exception as log_error:
+                print(f"Failed to log error: {log_error}") 
             
-            raise
+            raise e
 
     def _get_client_ip(self, request: Request) -> str:
         forwarded_for = request.headers.get("X-Forwarded-For")

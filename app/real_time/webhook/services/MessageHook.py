@@ -30,8 +30,6 @@ from app.whatsapp.media.external_services.WhatsAppMediaApi import WhatsAppMediaA
 from app.whatsapp.team_inbox.utils.conversation_status import ConversationStatus
 from app.annotations.models.Contact import Contact
 
-logger = get_logger(__name__)
-
 class MessageHook:
     def __init__(
         self,
@@ -72,76 +70,110 @@ class MessageHook:
         self.aws_region = aws_region
         self.chatbot_context_service = chatbot_context_service
         self.chatbot_flow_publisher = chatbot_flow_publisher
+        self.logger = get_logger("MessageHook")
+
+    def _get_logger(self, phone_id: str = "", message_id: str = "", conversation_id: str = "", **kwargs):
+        """Get contextual logger with message processing context"""
+        return self.logger.with_context(
+            phone_id=phone_id,
+            message_id=message_id,
+            conversation_id=conversation_id,
+            component='message_processing',
+            **kwargs
+        )
 
     async def handle_messages(self, payload: Dict[str, Any]) -> Optional[Any]:
+        phone_id = payload.get("metadata", {}).get("phone_number_id", "")
+        logger = self._get_logger(phone_id=phone_id, operation='handle_messages')
+        
         if any(m.get("errors") for m in payload.get("messages", [])):
-            logger.warning("message has errors unsupported message type and skipping")
+            await logger.awarning("Message has errors, unsupported message type - skipping")
             return None
+        
         try:
-            
             if payload.get("messages"):
+                await logger.ainfo("Processing received messages", message_count=len(payload.get("messages", [])))
                 return await self.handle_received_messages(payload)
             
             if payload.get("statuses"):
+                await logger.ainfo("Processing message statuses", status_count=len(payload.get("statuses", [])))
                 return await self.handle_statuses(payload)
             
-        except Exception:
-            pass
+        except Exception as e:
+            await logger.aexception("Unhandled error in message processing", error=str(e))
         return None
 
     async def handle_received_messages(self, payload: Dict[str, Any]) -> List[Dict[str, Any]]:
-        
         metadata = payload.get("metadata", {})
         display_number = metadata.get("display_phone_number")
         phone_id = metadata.get("phone_number_id")
+        
+        logger = self._get_logger(phone_id=phone_id, operation='handle_received_messages')
+        
         profile = await self.business_profile_service.get_by_phone_number_id(str(phone_id))
         access_token = profile.access_token
         contact_info = self._extract_contact_info(payload.get("contacts", []))
 
+        await logger.ainfo("Processing incoming messages", 
+                          display_number=display_number,
+                          contact_wa_id=contact_info.get("wa_id"))
+
         for msg in payload.get("messages", []):
+            message_id = msg.get("id", "")
+            msg_logger = self._get_logger(phone_id=phone_id, message_id=message_id, 
+                                        operation='process_single_message')
+            
             data = self._create_base_message_data(msg, display_number, phone_id, contact_info)
-            await self._process_message(msg, data, phone_id, access_token)
-            await self._handle_context(data, msg)
+            await self._process_message(msg, data, phone_id, access_token, msg_logger)
+            await self._handle_context(data, msg, msg_logger)
             
             conversation: Conversation = await self.get_or_create_conversation(
-                msg["from"], f'+{display_number}', contact_info, profile.id
+                msg["from"], f'+{display_number}', contact_info, profile.id, msg_logger
             )
+            
+            conv_logger = self._get_logger(phone_id=phone_id, message_id=message_id, 
+                                         conversation_id=str(conversation.id),
+                                         operation='process_conversation')
             
             msg_type = msg.get("type")
             if msg_type == "interactive":
-                await self._handle_chatbot_interaction(msg, conversation, data)
+                await self._handle_chatbot_interaction(msg, conversation, data, conv_logger)
             elif msg_type == "text":
-                await self._handle_text_response_to_chatbot(msg, conversation, data)
+                await self._handle_text_response_to_chatbot(msg, conversation, data, conv_logger)
             
-            logger.info(f"this is data context: {data}")
+            await conv_logger.ainfo("Message data processed", message_type=msg_type)
             await self.socket_message.emit_received_message(
                 message=data, phone_number_id=phone_id, conversation_id=str(conversation.id)
             )
-            await self._set_conversation_expiration(conversation.id)
+            await self._set_conversation_expiration(conversation.id, conv_logger)
             await self.save_message.process_message(
                 message_data=data, conversation_id=conversation.id, contact_id=conversation.contact_id
             )
 
-    async def _handle_chatbot_interaction(self, msg: Dict[str, Any], conversation: Conversation):
-
+    async def _handle_chatbot_interaction(self, msg: Dict[str, Any], conversation: Conversation, 
+                                        data: Dict[str, Any], logger):
         interactive = msg.get("interactive", {})
         interactive_type = interactive.get("type")
+        
+        await logger.ainfo("Processing chatbot interaction", interaction_type=interactive_type)
         
         if interactive_type == "button_reply":
             button_reply = interactive.get("button_reply", {})
             button_id = button_reply.get("id")
-            await self._process_chatbot_button_click(conversation, button_id, msg)
+            await self._process_chatbot_button_click(conversation, button_id, msg, logger)
         
         elif interactive_type == "list_reply":
             list_reply = interactive.get("list_reply", {})
             list_id = list_reply.get("id")
-            await self._process_chatbot_list_selection(conversation, list_id, msg)
+            await self._process_chatbot_list_selection(conversation, list_id, msg, logger)
 
-    async def _handle_text_response_to_chatbot(self, msg: Dict[str, Any], conversation: Conversation, data: Dict[str, Any]):
+    async def _handle_text_response_to_chatbot(self, msg: Dict[str, Any], conversation: Conversation, 
+                                             data: Dict[str, Any], logger):
         try:
             chatbot_context = await self.chatbot_context_service.get_chatbot_context(str(conversation.id))
             
             if not chatbot_context:
+                await logger.adebug("No chatbot context found for conversation")
                 return  
                 
             if chatbot_context.get("waiting_for_response") and chatbot_context.get("node_type") == "question":
@@ -150,7 +182,7 @@ class MessageHook:
                 
                 text_content = msg.get("text", {}).get("body", "")
                 
-                business_data = await self._get_business_data_for_conversation(conversation, msg)
+                business_data = await self._get_business_data_for_conversation(conversation, msg, logger)
                 
                 flow_payload = {
                     "conversation_id": str(conversation.id),
@@ -160,27 +192,29 @@ class MessageHook:
                 }
                 
                 await self.chatbot_flow_publisher.publish_flow_node_event(flow_payload)
-                logger.info(f"Published chatbot flow event for text response: {text_content[:50]}...")
+                await logger.ainfo("Published chatbot flow event for text response", 
+                                 text_preview=text_content[:50])
                 
         except Exception as e:
-            logger.error(f"Error handling text response to chatbot: {e}")
+            await logger.aexception("Error handling text response to chatbot", error=str(e))
 
-    async def _process_chatbot_button_click(self, conversation: Conversation, button_id: str, msg: Dict[str, Any]):
+    async def _process_chatbot_button_click(self, conversation: Conversation, button_id: str, 
+                                          msg: Dict[str, Any], logger):
         try:
             chatbot_context = await self.chatbot_context_service.get_chatbot_context(str(conversation.id))
             
             if not chatbot_context:
-                logger.info(f"No active chatbot context for conversation: {conversation.id}")
+                await logger.ainfo("No active chatbot context for conversation")
                 return
                 
             current_node_id = chatbot_context.get("current_node_id")
             chatbot_id = chatbot_context.get("chatbot_id")
             
             if not current_node_id or not chatbot_id:
-                logger.warning(f"Invalid chatbot context for conversation: {conversation.id}")
+                await logger.awarning("Invalid chatbot context for conversation")
                 return
             
-            business_data = await self._get_business_data_for_conversation(conversation, msg)
+            business_data = await self._get_business_data_for_conversation(conversation, msg, logger)
             
             flow_payload = {
                 "conversation_id": str(conversation.id),
@@ -193,23 +227,23 @@ class MessageHook:
             
             await self.chatbot_context_service.extend_context_ttl(str(conversation.id))
             
-            logger.info(f"Published chatbot flow event for button_id: {button_id}, conversation: {conversation.id}")
+            await logger.ainfo("Published chatbot flow event for button click", button_id=button_id)
             
         except Exception as e:
-            logger.error(f"Error processing chatbot button click: {e}")
+            await logger.aexception("Error processing chatbot button click", error=str(e), button_id=button_id)
 
-    async def _process_chatbot_list_selection(self, conversation: Conversation, list_id: str, msg: Dict[str, Any]):
+    async def _process_chatbot_list_selection(self, conversation: Conversation, list_id: str, 
+                                            msg: Dict[str, Any], logger):
+        await self._process_chatbot_button_click(conversation, list_id, msg, logger)
 
-        await self._process_chatbot_button_click(conversation, list_id, msg)
-
-    async def _get_business_data_for_conversation(self, conversation: Conversation, msg: Dict[str, Any]) -> Dict[str, Any]:
+    async def _get_business_data_for_conversation(self, conversation: Conversation, msg: Dict[str, Any], 
+                                                logger) -> Dict[str, Any]:
         try:
-            
             metadata = msg.get("metadata", {})
             phone_id = metadata.get("phone_number_id")
             
             if phone_id:
-                profile : BusinessProfile = await self.business_profile_service.get_by_phone_number_id(str(phone_id))
+                profile: BusinessProfile = await self.business_profile_service.get_by_phone_number_id(str(phone_id))
                 business_token = profile.access_token
             else:
                 client = await self.client_service.get_by_id(conversation.client_id)
@@ -225,25 +259,26 @@ class MessageHook:
             }
             
         except Exception as e:
-            logger.error(f"Error getting business data: {e}")
+            await logger.aexception("Error getting business data", error=str(e))
             raise
 
-    async def _process_message(
-        self, msg: Dict[str, Any], data: Dict[str, Any], phone_id: str, access_token: str
-    ) -> None:
+    async def _process_message(self, msg: Dict[str, Any], data: Dict[str, Any], 
+                             phone_id: str, access_token: str, logger) -> None:
         msg_type = msg.get("type")
         if msg_type in ("image", "video", "audio", "document"):
-            await self._handle_incoming_media(msg, data, phone_id, access_token)
+            await self._handle_incoming_media(msg, data, phone_id, access_token, logger)
         else:
             self._process_message_content(data, msg, msg_type)
-        logger.info(f"this is the data: {data} and this is the message: {msg}")
+        await logger.adebug("Message processed", message_type=msg_type)
 
-    async def _handle_incoming_media(
-        self, msg: Dict[str, Any], data: Dict[str, Any], phone_id: str, access_token: str,
-    ) -> None:
+    async def _handle_incoming_media(self, msg: Dict[str, Any], data: Dict[str, Any], 
+                                   phone_id: str, access_token: str, logger) -> None:
         msg_type = msg.get("type")
         media = msg.get(msg_type, {})
         media_id = media.get("id")
+        
+        await logger.ainfo("Processing incoming media", media_type=msg_type, media_id=media_id)
+        
         try:
             media_info = await self.media_api.retrieve_media_url(media_id, phone_id, access_token)
             media_url = media_info.get("url")
@@ -267,7 +302,10 @@ class MessageHook:
                 base_content["filename"] = media.get("filename", "")
             data["content"] = base_content
             
+            await logger.ainfo("Media uploaded successfully", s3_key=s3_key)
+            
         except Exception as e:
+            await logger.aexception("Failed to process media, using fallback", error=str(e))
             data["content"] = {
                 "media_id": media_id,
                 "mime_type": media.get("mime_type"),
@@ -292,7 +330,7 @@ class MessageHook:
         }
         return mime_map.get(mime_type, "bin")
 
-    async def _handle_context(self, data: Dict[str, Any], msg: Dict[str, Any]) -> None:
+    async def _handle_context(self, data: Dict[str, Any], msg: Dict[str, Any], logger) -> None:
         context = msg.get("context")
         if not context:
             data["context"] = None
@@ -307,35 +345,36 @@ class MessageHook:
                     "from": context.get("from"),
                     "message_id": context.get("id")
                 }
-                logger.info(f"Product inquiry context set: {data['context']}")
+                await logger.ainfo("Product inquiry context set", context_type="product_inquiry")
                 return
 
             context_message_id = context.get("id")
             if context_message_id:
                 original_message = await self.mongo_message.find_one({"wa_message_id": context_message_id})
-                logger.debug(f"Original message: {original_message}")
+                await logger.adebug("Looking up original message for context", original_message_id=context_message_id)
                 
                 if original_message:
-                    logger.debug(f"Original message found for context ID: {original_message.wa_message_id}")
+                    await logger.adebug("Original message found for context")
                     data["context"] = {
                         "type": "reply",
                         "original_content": original_message.content,
                         "replied_message_id": context_message_id
                     }
-                    logger.debug(f"Context set for reply to message: {context_message_id}")
                 else:
-                    logger.warning(f"Original message not found for context ID: {context_message_id}")
+                    await logger.awarning("Original message not found for context", context_message_id=context_message_id)
                     data["context"] = {
                         "type": "reply",
                         "replied_message_id": context_message_id
                     }
         except Exception as e:
-            logger.error(f"Error handling context: {e}")
+            await logger.aexception("Error handling context", error=str(e))
             data["context"] = None
 
-    async def get_or_create_conversation(
-        self, from_number: str, client_number: str, contact_info: Dict[str, Any],business_profile_id: str
-    ) -> Conversation:
+    async def get_or_create_conversation(self, from_number: str, client_number: str, 
+                                       contact_info: Dict[str, Any], business_profile_id: str, 
+                                       logger) -> Conversation:
+        await logger.ainfo("Getting or creating conversation", from_number=from_number, client_number=client_number)
+        
         convo: Conversation = await self.conversation_service.find_by_contact_and_client_number(
             contact_phone_number=from_number, client_phone_number=client_number,
         )
@@ -343,13 +382,14 @@ class MessageHook:
             if not convo.is_open:
                 convo.is_open = True
                 convo = await self.conversation_service.update(convo.id, {"is_open": True})
+                await logger.ainfo("Reopened existing conversation", conversation_id=str(convo.id))
             return convo
 
         client = await self.client_service.get_by_business_profile_number(client_number)
         contact = await self.contact_service.get_by_client_and_contact_number(client_number, from_number)
         country, national = Helper.number_parsed(from_number)
         
-        logger.info(f"country: {country}, national: {national} and contact: {contact}")
+        await logger.ainfo("Creating new conversation", country=country, national=national, contact_exists=bool(contact))
 
         if contact is None:
             contact = await self.contact_service.create(
@@ -362,21 +402,21 @@ class MessageHook:
                     client_id=client.id,
                 )
             )
-        # create assignment
+            await logger.ainfo("Created new contact", contact_id=str(contact.id))
+        
         assign = await self.assignment_service.create(
-            Assignment(user_id="0198cd65-dba6-7b01-9720-7be6355d1793", assigned_by="0198cd65-dba6-7b01-9720-7be6355d1793")
+            Assignment(user_id="0198ce0f-7d5e-70b6-9bec-af62fc5d47d1", assigned_by="0198ce0f-7d5e-70b6-9bec-af62fc5d47d1")
         )
         
         default_team: Team = await self.team_service.get_default_team_by_client_id(client.id)
-        
-        logger.info(f"default_team: {default_team} and assign: {assign} and contact: {contact}")
 
         conversation: Conversation = Conversation(
             contact_id=contact.id,
             client_id=client.id,
             assignment_id=assign.id,
             status=ConversationStatus.OPEN,
-            is_open=True
+            is_open=True,
+            chatbot_triggered=True
         )
         conversation_team_link = ConversationTeamLink(
             conversation=conversation, team=default_team
@@ -393,41 +433,66 @@ class MessageHook:
             contact_name=contact.name,
             contact_phone_number=contact.phone_number,
             country_code_phone_number=contact.country_code,
-            conversation_is_expired = False,
-            conversation_expiration_time = "23:59:59",
-            unread_count=0
+            conversation_is_expired=False,
+            conversation_expiration_time="23:59:59",
+            unread_count=0,
+            last_message="",
+            last_message_time=datetime.now(timezone.utc).isoformat()
         )
-        await self.socket_message.emit_create_new_conversation(conversation_body, business_profile_id)
+        
+        await self.socket_message.emit_create_new_conversation(conversation_body.model_dump(), business_profile_id)
+        
+        await logger.ainfo("Created new conversation", conversation_id=str(conversation_created.id))
         return conversation_created
 
-    async def _set_conversation_expiration(self, conversation_id: Any) -> None:
+    async def _set_conversation_expiration(self, conversation_id: Any, logger) -> None:
         tomorrow = datetime.now(timezone.utc) + timedelta(days=1)
         key = RedisHelper.redis_conversation_expired_key(conversation_id)
         await self.redis_service.set(key=key, value=tomorrow, ttl=86400)
+        await logger.adebug("Set conversation expiration", conversation_id=str(conversation_id))
 
     async def handle_statuses(self, payload: Dict[str, Any]) -> Dict[str, Any]:
         statuses = payload.get("statuses", [])
         meta = payload.get("metadata", {})
+        phone_id = meta.get("phone_number_id", "")
+        
+        logger = self._get_logger(phone_id=phone_id, operation='handle_statuses')
         details = []
+        
         for st in statuses:
+            message_id = st.get("id")
+            status = st.get("status")
+            
+            status_logger = self._get_logger(phone_id=phone_id, message_id=message_id, 
+                                           operation='process_status')
+            
             entry = {
                 "metadata": {
                     "display_phone_number": meta.get("display_phone_number"),
                     "phone_number_id": meta.get("phone_number_id"),
                 },
-                "wa_message_id": st.get("id"),
+                "wa_message_id": message_id,
                 "recipient_id": st.get("recipient_id"),
-                "status": st.get("status"),
+                "status": status,
                 "timestamp": st.get("timestamp"),
             }
-            logger.info(f"publishing status: {entry}")
+            await status_logger.ainfo("Publishing status update", status=status)
             
             await self.message_publisher.send_message(entry)
-            message_document = await self.mongo_message.find_one({"wa_message_id": st.get("id")})
+            message_document = await self.mongo_message.find_one({"wa_message_id": message_id})
             
-            logger.info(f"message_status_document: {message_document.conversation_id} , message_id: {message_document.id} and status: {st.get('status')}")
-            
-            await self.socket_message.emit_message_status(conversation_id=message_document.conversation_id, status=st.get("status"), message_id=message_document.id)
+            if message_document:
+                await status_logger.ainfo("Emitting message status update", 
+                                        conversation_id=str(message_document.conversation_id),
+                                        status=status)
+                
+                await self.socket_message.emit_message_status(
+                    conversation_id=message_document.conversation_id, 
+                    status=status, 
+                    message_id=message_document.id
+                )
+            else:
+                await status_logger.awarning("Message document not found for status update")
 
     def _extract_contact_info(self, contacts: List[Dict[str, Any]]) -> Dict[str, Any]:
         if not contacts:
@@ -495,7 +560,6 @@ class MessageHook:
                     "title": button_reply.get("title")
                 }
             })
-            logger.info(f"Button reply received - ID: {button_reply.get('id')}, Title: {button_reply.get('title')}")
         
         elif interactive_type == "list_reply":
             list_reply = interactive.get("list_reply", {})
@@ -510,10 +574,6 @@ class MessageHook:
                     "description": list_reply.get("description")
                 }
             })
-            logger.info(f"List reply received - ID: {list_reply.get('id')}, Title: {list_reply.get('title')}")
-        
-        else:
-            logger.warning(f"Unknown interactive type: {interactive_type}")
         
         return base_content
 

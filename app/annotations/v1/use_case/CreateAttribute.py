@@ -29,7 +29,10 @@ class CreateAttribute:
         
         if contact_id:
             contact = await self.contact_service.get(contact_id)
-            await self.contact_service.updateContractAttributes(contact_id, ContactAttributeLink(contact_id=contact.id, attribute_id=attribute.id, value=value))
+            
+            attribute_link = ContactAttributeLink(contact_id=contact.id, attribute_id=attribute.id, value=value)
+            
+            await self.contact_service.updateContactAttributes(contact_id, [attribute_link])
 
 
         return ApiResponse.success_response(data={"message": "Attribute created successfully"})

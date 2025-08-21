@@ -2,7 +2,7 @@ from datetime import datetime, timezone
 import os
 import socket
 from typing import Any, Dict, Optional
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, field_validator
 from app.utils.enums.LogLevel import LogLevel
 
 
@@ -40,3 +40,10 @@ class LogEventBody(BaseModel):
     
     class Config:
         use_enum_values = True
+
+    @field_validator('level', mode='before')
+    @classmethod
+    def validate_level(cls, v):
+        if isinstance(v, str):
+            return LogLevel(v.lower())
+        return v

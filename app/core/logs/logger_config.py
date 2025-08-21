@@ -95,7 +95,10 @@ def configure_structlog(*, debug: bool = False, service_name: str = "whatsapp-se
         logging.getLogger("pymongo.serverSelection").setLevel(logging.WARNING)
         logging.getLogger("motor").setLevel(logging.WARNING)
         logging.getLogger("message").setLevel(logging.WARNING)
-
+        logging.getLogger('aio_pika').setLevel(logging.WARNING)
+        logging.getLogger('aiormq').setLevel(logging.WARNING)
+        logging.getLogger('pamqp').setLevel(logging.WARNING)
+        logging.getLogger('amqp').setLevel(logging.WARNING)
     else:
         def custom_json_renderer(_, __, event_dict):
             if 'event' in event_dict:
@@ -137,6 +140,10 @@ def configure_structlog(*, debug: bool = False, service_name: str = "whatsapp-se
         logging.getLogger("motor").setLevel(logging.WARNING)
         logging.getLogger("fastapi").setLevel(logging.WARNING)
         logging.getLogger("message").setLevel(logging.WARNING)
+        logging.getLogger('aio_pika').setLevel(logging.WARNING)
+        logging.getLogger('aiormq').setLevel(logging.WARNING)
+        logging.getLogger('pamqp').setLevel(logging.WARNING)
+        logging.getLogger('amqp').setLevel(logging.WARNING)
 
     logging.basicConfig(
         level=min_level,

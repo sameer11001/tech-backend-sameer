@@ -268,8 +268,10 @@ class SystemLogService:
                         message_body=log_data,
                     )
                     
+                    level_str = log_event.level if isinstance(log_event.level, str) else log_event.level.value
+
                     await self.logger.adebug("Log event published", 
-                        level=log_event.level.value,
+                        level=level_str,
                         event_type=log_event.event_type,
                         message_preview=log_event.message[:50] + "..." if len(log_event.message) > 50 else log_event.message
                     )
