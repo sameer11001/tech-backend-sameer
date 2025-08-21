@@ -2,7 +2,7 @@ import asyncio
 import contextlib
 import re
 from typing import Optional
-from app.core.config import logger
+from app.core.logs import logger
 from app.core.storage.redis import AsyncRedisService
 from app.whatsapp.broadcast.use_case.BroadcastScheduler import BroadcastScheduler
 

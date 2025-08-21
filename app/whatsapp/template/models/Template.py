@@ -48,6 +48,10 @@ class Template(Document, BaseModelNoNone):
                 ("client_id", 1),
                 ("created_at", -1),
             ],
+            [
+                (name, 1),
+                ("created_at", -1),
+            ]
         ]
 
     class Config:

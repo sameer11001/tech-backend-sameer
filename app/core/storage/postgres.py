@@ -35,14 +35,14 @@ class PostgresDatabase:
     def create_session(self) -> AsyncSession:
         return self._session_factory()
 
-        
-async def provide_session(db_instance: PostgresDatabase) -> AsyncGenerator[AsyncSession, None]:
-    async with db_instance._session_factory() as session:
-        try:
-            yield session
-            await session.commit()
-        except Exception:
-            await session.rollback()
-            raise
-        finally:
-            await session.close()
+   
+async def create_session(db_instance: PostgresDatabase):
+    session = db_instance.create_session()
+    try:
+        yield session
+        await session.commit()
+    except Exception:
+        await session.rollback()
+        raise
+    finally:
+        await session.close()

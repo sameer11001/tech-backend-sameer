@@ -14,7 +14,7 @@ from app.whatsapp.media.v1.usecase.DeleteMedia import DeleteMedia
 from app.whatsapp.media.v1.usecase.DownloadMedia import DownloadMedia
 from app.whatsapp.media.v1.usecase.RetrieveMediaUrl import RetrieveMediaUrl
 from app.whatsapp.media.v1.usecase.UploadMedia import UploadMedia
-from app.core.config.logger import get_logger
+from app.core.logs.logger import get_logger
 
 logger = get_logger("WhatsappMediaController")
 router = APIRouter()

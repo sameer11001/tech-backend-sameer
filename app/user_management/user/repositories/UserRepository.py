@@ -9,86 +9,82 @@ from sqlalchemy.exc import SQLAlchemyError
 from sqlmodel.ext.asyncio.session import AsyncSession
 
 class UserRepository(BaseRepository[User]):
-    def __init__(self, session: AsyncSession):
+    def __init__(self, session : AsyncSession):
+        
+        self.session_manager = session
+        
         super().__init__(model=User, session=session)
 
     async def get_by_email(self, email: str) -> Optional[User]:
-        try:
-            statement = select(self.model).where(self.model.email == email)
-            result = await self.session.exec(statement)
-            return result.first()
-        except SQLAlchemyError as e:
-            await self.session.rollback()
-            raise DataBaseException(str(e))
-        
+        print(f"this is the get_by_email{self.session_manager}")
+        print(f"this is the get_by_email{self.session}")
+
+        async with self.session_manager as db_session:
+            try:
+                statement = select(self.model).where(self.model.email == email)
+                result = await db_session.exec(statement)
+                return result.first()
+            except SQLAlchemyError as e:
+                raise DataBaseException(str(e))
+            
     async def get_users_by_client_id(
         self, client_id: str, query: str, page: int, limit: int
     ) -> Dict[str, Union[List[User], int]]:
-        try:
-            base_query = select(self.model).where(self.model.client_id == client_id).order_by(
-                self.model.created_at.desc()
-            )
-            if query:
-                base_query = base_query.where(
-                    or_(
-                        self.model.email.ilike(f"%{query}%"),
-                        self.model.first_name.ilike(f"%{query}%"),
-                        self.model.last_name.ilike(f"%{query}%") 
-                    )
+        print(f"this is the get_users_by_client_id{self.session_manager}")
+        print(f"this is the get_users_by_client_id{self.session}")
+        async with self.session_manager as db_session:
+            try:
+                base_query = select(self.model).where(self.model.client_id == client_id).order_by(
+                    self.model.created_at.desc()
                 )
-            
-            if query:
-                total_count = await self.session.exec(
-                    select(func.count(self.model.id)).where(
-                        self.model.client_id == client_id,
+                if query:
+                    base_query = base_query.where(
                         or_(
                             self.model.email.ilike(f"%{query}%"),
                             self.model.first_name.ilike(f"%{query}%"),
-                            self.model.last_name.ilike(f"%{query}%") 
+                            self.model.last_name.ilike(f"%{query}%")
                         )
                     )
+
+                if query:
+                    total_count = await db_session.exec(
+                        select(func.count(self.model.id)).where(
+                            self.model.client_id == client_id,
+                            or_(
+                                self.model.email.ilike(f"%{query}%"),
+                                self.model.first_name.ilike(f"%{query}%"),
+                                self.model.last_name.ilike(f"%{query}%")
+                            )
+                        )
+                    )
+                else:
+                    total_count = await db_session.exec(
+                        select(func.count(self.model.id)).where(self.model.client_id == client_id)
+                    )
+
+                users = await db_session.exec(
+                    base_query.offset((page - 1) * limit).limit(limit)
                 )
-            else:    
-                total_count = await self.session.exec(
-                    select(func.count(self.model.id)).where(self.model.client_id == client_id)
-                )
-            
-            users = await self.session.exec(
-                base_query.offset((page - 1) * limit).limit(limit)
-            )
-            
-            return {"users": users.all(), "total_count": total_count.first()}
-        except SQLAlchemyError as e:
-            await self.session.rollback()
-            raise DataBaseException(str(e))
+
+                return {"users": users.all(), "total_count": total_count.first()}
+            except SQLAlchemyError as e:
+                raise DataBaseException(str(e))
+
     async def get_users_by_client_id_count(self, client_id: str) -> int:
-        try:
-            query = select(func.count(self.model.id)).where(
-                self.model.client_id == client_id
-            )
-            result = await self.session.exec(query)
-            return result.all()
-        except SQLAlchemyError as e:
-            await self.session.rollback()
-            raise DataBaseException(str(e))
+        async with self.session_manager as db_session:
+            try:
+                query = select(func.count(self.model.id)).where(self.model.client_id == client_id)
+                result = await db_session.exec(query)
+                return result.first()
+            except SQLAlchemyError as e:
+                raise DataBaseException(str(e))
+
     async def search_user(
         self, query_str: str, client_id: str, page: int, limit: int
     ) -> Dict[str, Union[List[User], int]]:
-        try:
-            count_query = select(func.count(self.model.id)).where(
-                self.model.client_id == client_id,
-                or_(
-                    self.model.email.contains(query_str),
-                    self.model.first_name.contains(query_str),
-                    self.model.last_name.contains(query_str),
-                ),
-            )
-            count_result = await self.session.exec(count_query)
-            total_count = count_result.first()
-
-            query = (
-                select(self.model)
-                .where(
+        async with self.session_manager as db_session:
+            try:
+                count_query = select(func.count(self.model.id)).where(
                     self.model.client_id == client_id,
                     or_(
                         self.model.email.contains(query_str),
@@ -96,20 +92,35 @@ class UserRepository(BaseRepository[User]):
                         self.model.last_name.contains(query_str),
                     ),
                 )
-                .offset((page - 1) * limit)
-                .limit(limit)
-            )
-            result = await self.session.exec(query)
-            users = result.all()
+                count_result = await db_session.exec(count_query)
+                total_count = count_result.first()
 
-            return {"users": users, "total_count": total_count}
-        except SQLAlchemyError as e:
-            await self.session.rollback()
-            raise DataBaseException(str(e))  
+                query = (
+                    select(self.model)
+                    .where(
+                        self.model.client_id == client_id,
+                        or_(
+                            self.model.email.contains(query_str),
+                            self.model.first_name.contains(query_str),
+                            self.model.last_name.contains(query_str),
+                        ),
+                    )
+                    .offset((page - 1) * limit)
+                    .limit(limit)
+                )
+                result = await db_session.exec(query)
+                users = result.all()
+
+                return {"users": users, "total_count": total_count}
+            except SQLAlchemyError as e:
+                raise DataBaseException(str(e))
+
     async def get_by_id_and_team_id(self, user_id: str, team_id: str) -> Optional[User]:
-        try:
-            result = await self.session.exec(select(self.model).where(self.model.id == user_id, self.model.team_id == team_id))
-            return result.first()
-        except SQLAlchemyError as e:
-            await self.session.rollback()
-            raise DataBaseException(str(e))
+        async with self.session_manager as db_session:
+            try:
+                result = await db_session.exec(
+                    select(self.model).where(self.model.id == user_id, self.model.team_id == team_id)
+                )
+                return result.first()
+            except SQLAlchemyError as e:
+                raise DataBaseException(str(e))

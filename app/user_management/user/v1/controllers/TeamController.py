@@ -2,7 +2,7 @@ import logging
 from fastapi import APIRouter, Depends, Query
 from dependency_injector.wiring import Provide, inject
 
-from app.core.config.logger import get_logger
+from app.core.logs.logger import get_logger
 from app.core.security.JwtUtility import get_current_user
 from app.core.config.container import Container
 from app.core.exceptions.custom_exceptions.AlreadyExistException import AlreadyExistException

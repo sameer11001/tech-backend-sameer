@@ -1,5 +1,5 @@
 import math
-from typing import Any, Dict
+from typing import Any, Dict, Optional
 from uuid import UUID
 
 from fastapi import logger
@@ -9,6 +9,7 @@ from app.core.schemas.BaseResponse import ApiResponse
 from app.core.schemas.PageableResponse import PageableResponse
 from app.user_management.user.models.User import User
 from app.user_management.user.services.UserService import UserService
+from app.utils.enums.SortBy import SortByCreatedAt
 from app.whatsapp.business_profile.external_services.BusinessProfileApi import (
     BusinessProfileApi,
 )
@@ -31,18 +32,20 @@ class GetTemplates:
         self.template_mongo_crud = template_mongo_crud
     
     
-    async def execute(self,user_id: str, page: int = 1, limit: int = 10):
+    async def execute(self,user_id: str, page: int = 1, limit: int = 10, sort_by: Optional[SortByCreatedAt] = SortByCreatedAt.DESC, search_name: Optional[str] = ""):
 
         user: User = await self.user_service.get(user_id)
         client: Client = user.client
-
-        skip = (page - 1) * limit
         
         query: Dict[str, Any] = {
             "client_id": client.id
         } 
+        skip = (page - 1) * limit
+        sort = [("created_at", sort_by.value)]
         
-        sort = [("created_at", -1)]
+        if search_name:
+            query["name"] = {"$regex": f"^{search_name}", "$options": "i"}
+
         templates = await self.template_mongo_crud.find_many(
             query=query,
             skip=skip,
@@ -54,7 +57,6 @@ class GetTemplates:
         
         total_pages = math.ceil(total / limit)
         
-
         templates_pagination={
                 "total_items": total,
                 "total_pages": total_pages,

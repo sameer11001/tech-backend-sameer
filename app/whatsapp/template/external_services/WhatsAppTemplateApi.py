@@ -4,6 +4,7 @@ from app.core.services.BaseWhatsAppBusinessApi import BaseWhatsAppBusinessApi
 
 from app.core.decorators.log_decorator import log_class_methods
 from app.core.exceptions.custom_exceptions.ClientExceptionHandler import ClientException
+from app.core.services.HTTPClient import EnhancedHTTPClient
 from app.whatsapp.template.models.schema.TextMessageTemplate import TextMessageTemplate
 from app.whatsapp.template.models.schema.MediaMessageTemplate import MediaMessageTemplate
 from app.whatsapp.template.models.schema.InteractiveMessageTemplate import (
@@ -19,7 +20,7 @@ from app.whatsapp.template.models.schema.MultiProductMessageTemplate import (
 
 @log_class_methods("WhatsAppTemplateApi")
 class WhatsAppTemplateApi(BaseWhatsAppBusinessApi):
-    def __init__(self, client: httpx.AsyncClient):
+    def __init__(self, client: EnhancedHTTPClient):
         self.client = client
         super().__init__()
 

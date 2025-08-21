@@ -8,7 +8,7 @@ from app.whatsapp.business_profile.v1.models.BusinessProfile import BusinessProf
 from app.whatsapp.business_profile.v1.services.BusinessProfileService import BusinessProfileService
 from app.user_management.user.services.UserService import UserService
 from app.core.schemas.BaseResponse import ApiResponse
-from app.core.config.logger import get_logger
+from app.core.logs.logger import get_logger
 
 logger = get_logger(__name__)
 

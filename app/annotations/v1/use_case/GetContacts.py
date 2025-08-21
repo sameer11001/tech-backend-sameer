@@ -6,7 +6,6 @@ from app.annotations.v1.schemas.response.GetContactsResponse import GetContactsR
 from app.user_management.user.models.Client import Client
 from app.user_management.user.models.User import User
 from app.user_management.user.services.UserService import UserService
-from app.utils.enums.SortBy import SortBy
 
 
 class GetContacts:
@@ -14,7 +13,7 @@ class GetContacts:
         self.contact_service = contact_service
         self.user_service = user_service
     
-    async def execute(self, user_id: str, page: int = 1, limit: int = 10, search: Optional[str] = None, sort_by: Optional[SortBy] = None, sort_value: Optional[str] = None):
+    async def execute(self, user_id: str, page: int = 1, limit: int = 10, search: Optional[str] = None):
         
         user: User = await self.user_service.get(user_id)
         client: Client = user.client
@@ -24,5 +23,6 @@ class GetContacts:
         return GetContactsResponse(contacts=contact, 
                                     total_count=contacts['total_count'], 
                                     total_pages=(contacts['total_count'] + limit - 1) // limit,
-                                    limit=limit, page=page
+                                    limit=limit, 
+                                    page=page
                                     )

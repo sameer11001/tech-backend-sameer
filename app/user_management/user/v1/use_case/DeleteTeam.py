@@ -1,4 +1,4 @@
-from app.core.config.logger import get_logger
+from app.core.logs.logger import get_logger
 
 from app.core.exceptions.custom_exceptions.ForbiddenException import ForbiddenException
 from app.user_management.user.models.Team import Team

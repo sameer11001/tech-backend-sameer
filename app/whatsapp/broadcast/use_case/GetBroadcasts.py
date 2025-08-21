@@ -1,6 +1,6 @@
 from typing import Optional
 from uuid import UUID
-from app.core.config import logger
+from app.core.logs import logger
 
 from app.core.schemas.BaseResponse import ApiResponse
 from app.whatsapp.broadcast.models.BroadCast import BroadCast

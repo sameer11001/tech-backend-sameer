@@ -60,10 +60,10 @@ class CreateNewConversation:
         self.redis_service = redis_service
       
       
-    async def excute(self, user_id: str ,request_body:CreateConversationRequest ):
+    async def excute(self, user_id: str ,request_body: CreateConversationRequest):
         
         user: User = await self.user_service.get(user_id)
-        
+        full_number = f"{request_body.contact_country_code}{request_body.contact_phone_number}"
         conversation = await self.conversation_service.find_by_contact_and_client_id(
             contact_phone_number=request_body.contact_phone_number,
             client_id= str(user.client_id)
@@ -77,10 +77,11 @@ class CreateNewConversation:
         
         template_object = TemplateBuilder.build_template_object(template_body.model_dump(exclude_none=True), request_body.parameters).model_dump(exclude_none=True)
         
-        contact : Contact = await self.contact_service.get_by_client_id_phone_number(client_id = str(user.client_id),contact_number=request_body.contact_phone_number)
-        country_code,national_number = Helper.number_parsed(request_body.contact_phone_number)
-        if not contact :
+        contact : Contact = await self.contact_service.get_by_client_id_phone_number(client_id = str(user.client_id),contact_number=full_number)
+        
+        country_code,national_number = Helper.number_parsed(full_number)
 
+        if not contact :
             contact_data : Contact = Contact (
                 country_code=str(country_code),
                 phone_number=str(national_number), 
@@ -114,7 +115,7 @@ class CreateNewConversation:
         
         request_model = SendTemplateRequest(
             messaging_product="whatsapp",
-            to=request_body.contact_phone_number,
+            to=full_number,
             type="template",
             template=template_object,
         )

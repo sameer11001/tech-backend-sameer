@@ -34,10 +34,10 @@ class CreateChatBot:
     
     async def execute(
         self,
-        business_id: str,
+        business_profile_id: str,
         request_body: CreateChatBotRequest
     ) -> ChatBotMeta:
-        business_profile : BusinessProfile = await self.business_service.get(business_id)
+        business_profile : BusinessProfile = await self.business_service.get(business_profile_id)
         client_id = business_profile.client_id
 
         await self.chatbot_service.get_by_name(
@@ -56,7 +56,7 @@ class CreateChatBot:
         created = await self.chatbot_service.create(chatbot_meta)
         
         response_body = CreateChatBotResponse(
-            id=created.id,
+            id=str(created.id),
             name=created.name,
             version=created.version,
             communicate_type=created.communicate_type,

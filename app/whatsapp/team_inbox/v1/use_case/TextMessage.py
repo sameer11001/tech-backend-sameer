@@ -1,6 +1,6 @@
 from typing import Any, Dict, Optional
 from app.annotations.services.ContactService import ContactService
-from app.core.config.logger import get_logger
+from app.core.logs.logger import get_logger
 
 from app.core.exceptions.custom_exceptions.EntityNotFoundException import EntityNotFoundException
 from app.core.repository.MongoRepository import MongoCRUD

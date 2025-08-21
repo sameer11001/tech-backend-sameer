@@ -3,13 +3,14 @@
 import httpx, json
 from app.core.services.BaseWhatsAppBusinessApi import BaseWhatsAppBusinessApi
 from app.core.decorators.log_decorator import log_class_methods
-from app.core.config.logger import get_logger
+from app.core.logs.logger import get_logger
+from app.core.services.HTTPClient import EnhancedHTTPClient
 
 logger = get_logger(__name__)
 
 @log_class_methods("BusinessProfileApi")
 class BusinessProfileApi(BaseWhatsAppBusinessApi):
-    def __init__(self, client: httpx.AsyncClient):
+    def __init__(self, client: EnhancedHTTPClient):
         super().__init__()
         self.client = client
 

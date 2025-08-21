@@ -6,6 +6,7 @@ from app.core.exceptions.custom_exceptions.ClientExceptionHandler import ClientE
 from app.core.exceptions.custom_exceptions.DataBaseException import DataBaseException
 from app.core.exceptions.GlobalException import GlobalException
 from app.core.exceptions.custom_exceptions.UnAuthorizedException import UnAuthorizedException
+from app.utils.enums.SortBy import SortByCreatedAt
 from app.utils.generate_responses import generate_responses
 from app.whatsapp.template.models.schema.template_body.DynamicTemplateRequest import DynamicTemplateRequest
 from app.whatsapp.template.v1.usecase.CreateTemplate import CreateTemplate
@@ -30,6 +31,8 @@ router = APIRouter()
 async def get_templates(
     page: int = Query(1, gt=0, description="The page number to fetch."),
     limit: int = Query(10, gt=0, description="The maximum number of templates to return per page."),
+    sort_by: SortByCreatedAt = Query(SortByCreatedAt.DESC, description="The field to sort by."),
+    search_name: str = Query("", description="The name to search for."),
     get_templates_use_case: GetTemplates = Depends(
         Provide[Container.whatsapp_template_get_templates]
     ),
@@ -38,7 +41,7 @@ async def get_templates(
     try:
         user_id = token["userId"]
         response = await get_templates_use_case.execute(
-            user_id=user_id,  page=page, limit=limit
+            user_id=user_id,  page=page, limit=limit, sort_by=sort_by, search_name=search_name
         )
         return response
     except GlobalException as e:

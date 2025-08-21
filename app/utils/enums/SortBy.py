@@ -1,6 +1,6 @@
 from enum import Enum
 
 
-class SortBy(str, Enum):
-    CREATED_AT = "created_at"
-    UPDATED_AT = "updated_at"
+class SortByCreatedAt(int, Enum):
+    ASC = 1
+    DESC = -1

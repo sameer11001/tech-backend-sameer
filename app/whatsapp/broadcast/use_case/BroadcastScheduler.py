@@ -3,7 +3,7 @@ from uuid import UUID
 from app.annotations.services.ContactService import ContactService
 
 from app.events.pub.MessageBroadcastPublisher import MessageBroadcastPublisher
-from app.core.config.logger import get_logger
+from app.core.logs.logger import get_logger
 from app.core.repository.MongoRepository import MongoCRUD
 from app.core.storage.redis import AsyncRedisService
 from app.user_management.user.models.Client import Client

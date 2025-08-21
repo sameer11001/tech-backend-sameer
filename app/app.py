@@ -1,38 +1,36 @@
-import logging
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
-from app.core.config.LoggingBaseMiddleWare import StructlogRequestMiddleware
-from app.core.config.logger_config import configure_structlog
+import httpx
+from app.core.logs.LoggingBaseMiddleWare import  LoggingMiddleware
+from app.core.logs.logger_config import configure_structlog
 from socketio import ASGIApp
 from starlette.middleware.sessions import SessionMiddleware
 from app.core.config.appstartup import lifespan
 from app.core.config.container import Container
 from app.core.config.settings import settings
 from app.core.exceptions.GlobalException import GlobalException
-from app.core.exceptions.ErrorHandler import (
-    global_exception_handler,
-    http_exception_handler,
-    python_exception_handler,
-)
+
 from app.events.app_events_route import rabbitmq_router
 from app.router_v1 import api_router_v1
 
-configure_structlog(debug=False)
-
-logging.getLogger("pymongo").setLevel(logging.WARNING)  
+configure_structlog(
+    debug=True,
+    service_name="whatsapp-service"
+)
 
 fastapi = FastAPI(
     lifespan=lifespan,
     title="ProgGate API",
-    redirect_slashes=False
+    redirect_slashes=False,
+    docs_url="/docs",
+    redoc_url=None
 )
 
 container = Container()
-
 container.socket_message_gateway()      
 sio_server = container.sio()       
+error_handler = container.error_handler()
 container.wire(modules=[__name__])
-fastapi.container = container
 
 fastapi.add_middleware(
     SessionMiddleware,
@@ -54,10 +52,16 @@ fastapi.add_middleware(
     allow_headers=["*"],
 )
 
-fastapi.add_middleware(StructlogRequestMiddleware)
-fastapi.add_exception_handler(HTTPException, http_exception_handler)
-fastapi.add_exception_handler(GlobalException, global_exception_handler)
-fastapi.add_exception_handler(Exception, python_exception_handler)
+fastapi.add_middleware(LoggingMiddleware,system_log_service=container.system_log_service)
+
+fastapi.add_exception_handler(HTTPException, error_handler.handle_http_exception)
+fastapi.add_exception_handler(GlobalException, error_handler.handle_global_exception)
+fastapi.add_exception_handler(Exception, error_handler.handle_python_exception)
+fastapi.add_exception_handler(
+    httpx.HTTPStatusError, 
+    error_handler.handle_client_exception
+)
+
 fastapi.include_router(api_router_v1, prefix="/api/v1")
 
 fastapi.include_router(rabbitmq_router)

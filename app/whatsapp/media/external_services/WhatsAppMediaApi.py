@@ -2,10 +2,11 @@ import mimetypes
 from fastapi import UploadFile
 import httpx
 from app.core.services.BaseWhatsAppBusinessApi import BaseWhatsAppBusinessApi
+from app.core.services.HTTPClient import EnhancedHTTPClient
 
 
 class WhatsAppMediaApi(BaseWhatsAppBusinessApi):
-    def __init__(self, client: httpx.AsyncClient):
+    def __init__(self, client: EnhancedHTTPClient):
         self.client = client
         super().__init__()
 

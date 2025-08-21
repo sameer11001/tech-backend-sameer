@@ -1,9 +1,11 @@
 from typing import Optional
 from uuid import UUID
+from app.annotations.models.ContactNoteLink import ContactNoteLink
 from app.annotations.models.Note import Note
 from app.annotations.services.ContactService import ContactService
 from app.annotations.services.NoteService import NoteService
 
+from app.core.exceptions.custom_exceptions.EntityNotFoundException import EntityNotFoundException
 from app.core.schemas.BaseResponse import ApiResponse
 from app.user_management.user.services.UserService import UserService
 
@@ -24,25 +26,16 @@ class CreateNote:
         user = await self.user_service.get(user_id)
         contact = await self.contact_service.get(contact_id)
         
-        if not user:
-            return ApiResponse.error_response(
-                message="User not found",
-                status_code=404
-            )
-        if not contact:
-            return ApiResponse.error_response(
-                message="Contact not found",
-                status_code=404
-            )
+        note_body = Note(content=content, user_id=user_id)
         
-
-        note = await self.note_service.create(Note(content=content, user_id=user_id))
-
         if contact:
-            await self.note_service.link_contact(note.id, contact.id)
-        if user:
-            await self.note_service.link_user(note.id, user.id)
+            contact_note_link = ContactNoteLink(note = note_body,contact = contact)
+            note_body.contact_links.append(contact_note_link)
         
+        if user:
+            note_body.user_id = user.id
+        
+        await self.note_service.create(note_body)
 
         return ApiResponse.success_response(
             data={"message": "Note created successfully"}

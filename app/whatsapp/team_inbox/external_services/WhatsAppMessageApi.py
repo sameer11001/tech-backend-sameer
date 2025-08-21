@@ -2,11 +2,12 @@ from typing import Optional, Literal
 import httpx
 from app.core.services.BaseWhatsAppBusinessApi import BaseWhatsAppBusinessApi
 from app.core.decorators.log_decorator import log_class_methods
+from app.core.services.HTTPClient import EnhancedHTTPClient
 from app.whatsapp.template.models.schema.SendTemplateRequest import SendTemplateRequest
 
 @log_class_methods("WhatsAppMessageApi")
 class WhatsAppMessageApi(BaseWhatsAppBusinessApi):
-    def __init__(self, client: httpx.AsyncClient):
+    def __init__(self, client: EnhancedHTTPClient):
         self.client = client
         super().__init__()
 

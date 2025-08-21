@@ -14,23 +14,3 @@ class DynamicInteractiveMessageRequest(BaseModel):
     footer: Optional[InteractiveFooterRequest] = None
     action: InteractiveActionRequest
     
-    @field_validator('action')
-    @classmethod
-    def validate_action_based_on_type(cls, v: InteractiveActionRequest, info):
-        message_type = info.data.get('type')
-        
-        if message_type == InteractiveType.BUTTON:
-            if not v.buttons or len(v.buttons) == 0:
-                raise ValueError("Button type interactive message must have buttons")
-            if v.sections or v.button:
-                raise ValueError("Button type interactive message should not have sections or button text")
-                
-        elif message_type == InteractiveType.LIST:
-            if not v.sections or len(v.sections) == 0:
-                raise ValueError("List type interactive message must have sections")
-            if not v.button:
-                raise ValueError("List type interactive message must have button text")
-            if v.buttons:
-                raise ValueError("List type interactive message should not have buttons")
-        
-        return v

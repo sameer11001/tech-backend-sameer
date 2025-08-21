@@ -1,5 +1,9 @@
+from asyncio.log import logger
+from io import BytesIO
+import io
 from typing import Any, Dict, List
 
+from fastapi import UploadFile
 import uuid6
 from app.chat_bot.models.ChatBot import FlowNode, ServiceHook
 from app.chat_bot.models.ChatBotMeta import ChatBotMeta
@@ -43,20 +47,20 @@ class AddFlowNode:
     
     async def execute(
         self,
-        business_id: str,
+        business_profile_id: str,
         request_body: DynamicChatBotRequest
-    ) -> ChatBotMeta:
-
+    ) :
+        logger.debug("we are here")
         chat_bot = await self.chatbot_service.get(
             request_body.chatbot_id, 
         )
 
         for node in request_body.nodes:
-            domain_node : FlowNode = await self.dispatch_nodes(node, business_id)
+            domain_node : FlowNode = await self.dispatch_nodes(node, business_profile_id)
             domain_node.chat_bot_id = chat_bot.id
             await self.mongo_crud_chat_bot.create(domain_node)
         
-        return ApiResponse.success_response(message="added successfully" ,status_code=204)
+        return ApiResponse.success_response(data=None,message="added successfully" ,status_code=204)
     
     async def dispatch_nodes(self, node: DynamicFlowNodeRequest,business_id : str) -> FlowNode:
         content_payload = None
@@ -93,115 +97,84 @@ class AddFlowNode:
         self, 
         node: DynamicFlowNodeRequest, 
         business_id: str
-    ) -> tuple[Dict[str, Any], List[Dict[str, Any]]]:
-        
+    ) -> tuple[dict, list[dict]]:
+    
         if not node.body or not node.body.body_button:
             raise ValueError("Interactive button node must have body_button")
-            
+    
         button_body: DynamicInteractiveMessageRequest = node.body.body_button
-        content_payload = {
-            "interactive_type": button_body.type.value,
-            "whatsapp_interactive": {}  
-        }
+        content_payload = {"interactive_type": button_body.type.value, "whatsapp_interactive": {}}
         node_buttons = []
-        
-        whatsapp_interactive = {
-            "type": button_body.type.value
-        }
-        
-        if button_body.type == InteractiveType.BUTTON:
-            if button_body.header:
-                header_data = await self._build_interactive_header(button_body.header, business_id)
-                whatsapp_interactive["header"] = header_data
-                content_payload["header"] = header_data
-            
-            whatsapp_interactive["body"] = {
-                "text": button_body.body.text
-            }
-            content_payload["body_text"] = button_body.body.text
-            
-            if button_body.footer:
-                whatsapp_interactive["footer"] = {
-                    "text": button_body.footer.text
-                }
-                content_payload["footer_text"] = button_body.footer.text
-            
-            if button_body.action and button_body.action.buttons:
+    
+        whatsapp_interactive = {"type": button_body.type.value}
+    
+        if button_body.header:
+            header_data = await self._build_interactive_header(button_body.header, business_id)
+            whatsapp_interactive["header"] = header_data
+            content_payload["header"] = header_data
+    
+        whatsapp_interactive["body"] = {"text": button_body.body.text}
+        content_payload["body_text"] = button_body.body.text
+    
+        if button_body.footer:
+            whatsapp_interactive["footer"] = {"text": button_body.footer.text}
+            content_payload["footer_text"] = button_body.footer.text
+    
+        if button_body.action:
+            if button_body.type == InteractiveType.BUTTON and button_body.action.buttons:
                 whatsapp_buttons = []
-                for btn in button_body.action.buttons:
-                    whatsapp_btn = {
+                for idx, btn in enumerate(button_body.action.buttons):
+                    reply_id = btn.reply.id
+                    reply_title = btn.reply.title
+                    next_node_id = btn.reply.next_node_id
+    
+                    whatsapp_buttons.append({
                         "type": "reply",
                         "reply": {
-                            "id": btn.reply.id if btn.reply else f"btn_{len(whatsapp_buttons)}",
-                            "title": btn.reply.title if btn.reply else f"Button {len(whatsapp_buttons)+1}"
+                            "id": reply_id,
+                            "title": reply_title
                         }
-                    }
-                    whatsapp_buttons.append(whatsapp_btn)
-                    
+                    })
+    
                     node_buttons.append({
                         "type": "reply",
-                        "id": btn.reply.id if btn.reply else f"btn_{len(node_buttons)}",
-                        "title": btn.reply.title if btn.reply else f"Button {len(node_buttons)+1}",
-                        "next_node_id": getattr(btn, 'next_node_id', None)
+                        "id": reply_id,
+                        "title": reply_title,
+                        "next_node_id": next_node_id
                     })
-                
-                whatsapp_interactive["action"] = {
-                    "buttons": whatsapp_buttons
-                }
-        
-        elif button_body.type == InteractiveType.LIST:
-            if button_body.header:
-                header_data = await self._build_interactive_header(button_body.header, business_id)
-                whatsapp_interactive["header"] = header_data
-                content_payload["header"] = header_data
-            
-            whatsapp_interactive["body"] = {
-                "text": button_body.body.text
-            }
-            content_payload["body_text"] = button_body.body.text
-            
-            if button_body.footer:
-                whatsapp_interactive["footer"] = {
-                    "text": button_body.footer.text
-                }
-                content_payload["footer_text"] = button_body.footer.text
-            
-            if button_body.action and button_body.action.sections:
+    
+                whatsapp_interactive["action"] = {"buttons": whatsapp_buttons}
+    
+            elif button_body.type == InteractiveType.LIST and button_body.action.sections:
                 whatsapp_sections = []
                 for section in button_body.action.sections:
                     whatsapp_rows = []
                     for row in section.rows:
-                        whatsapp_row = {
-                            "id": row.id,
-                            "title": row.title
-                        }
-                        if row.description:
+                        whatsapp_row = {"id": row.id, "title": row.title}
+                        if hasattr(row, "description") and row.description:
                             whatsapp_row["description"] = row.description
                         whatsapp_rows.append(whatsapp_row)
-                        
+    
                         node_buttons.append({
                             "type": "list_reply",
                             "id": row.id,
                             "title": row.title,
-                            "description": row.description,
-                            "section_title": section.title,
-                            "next_node_id": getattr(row, 'next_node_id', None)
+                            "description": getattr(row, "description", None),
+                            "section_title": getattr(section, "title", None),
+                            "next_node_id": getattr(row, "next_node_id", None)
                         })
-                    
-                    whatsapp_section = {
-                        "rows": whatsapp_rows
-                    }
-                    if section.title:
+    
+                    whatsapp_section = {"rows": whatsapp_rows}
+                    if getattr(section, "title", None):
                         whatsapp_section["title"] = section.title
                     whatsapp_sections.append(whatsapp_section)
-                
+    
                 whatsapp_interactive["action"] = {
                     "button": button_body.action.button or "Select an option",
                     "sections": whatsapp_sections
                 }
-        
+    
         content_payload["whatsapp_interactive"] = whatsapp_interactive
-        
         return content_payload, node_buttons
 
 
@@ -353,13 +326,19 @@ class AddFlowNode:
         if not media_content or "bytes" not in media_content:
             raise ValueError("Media content must contain bytes")
             
-        media_bytes = media_content["bytes"]
+        media_bytes : io.BytesIO = media_content["bytes"]
         mime_type = media_content.get("mime_type", "")
         file_name = media_content.get("file_name") or f"{uuid6.uuid7()}"
         
-        if not file_name.split('.')[-1] and mime_type:
-            extension = mime_type.split('/')[-1]
+        if "." not in file_name and mime_type:
+            extension = mime_type.split("/")[-1]
             file_name = f"{file_name}.{extension}"
+            
+        upload_file = UploadFile(
+            filename=file_name,
+            file=io.BytesIO(media_bytes.getvalue()),  
+            content_type=mime_type,
+        )
         
         business_profile = await self.business_service.get(business_id)
         
@@ -367,8 +346,9 @@ class AddFlowNode:
             media_resp = await self.whatsapp_media_api.upload_media(
                 business_profile.phone_number_id,
                 business_profile.access_token,
-                media_bytes
+                upload_file
             )
+            
             media_id = media_resp["id"]
         except Exception as e:
             raise ValueError(f"Failed to upload media to WhatsApp: {str(e)}")
@@ -377,7 +357,7 @@ class AddFlowNode:
         
         try:
             cdn_url = self.s3_bucket_service.upload_fileobj(
-                media_bytes, file_name=file_name
+                upload_file.file, file_name=file_name
             )
         except Exception as e:
             raise ValueError(f"Failed to upload media to S3: {str(e)}")

@@ -14,6 +14,7 @@ from my_celery.config.settings import settings
 from my_celery.config.celery_config import task_log
 from my_celery.database.MongoCRUD import MongoCRUD
 from my_celery.database.redis import RedisService
+from my_celery.models.Logger import Logger
 from my_celery.models.ChatBot import FlowNode
 from my_celery.models.Message import Message
 from my_celery.database.db_config import psql_engine
@@ -23,13 +24,14 @@ mongo_client: Optional[MongoClient] = None
 mongo_engine: Optional[SyncEngine] = None
 message_crud: Optional[MongoCRUD] = None
 chatbot_crud: Optional[MongoCRUD] = None
+logs_crud: Optional[MongoCRUD] = None
 s3_bucket_service: Optional[S3BucketService] = None
 redis_service: Optional[RedisService] = None
 chat_bot_context_service_instance: Optional[ChatbotContextService] = None
 
 
 def initialize_mongo_resources():
-    global mongo_client, mongo_engine, message_crud, chatbot_crud
+    global mongo_client, mongo_engine, message_crud, chatbot_crud, logs_crud
     mongo_client = MongoClient(
         settings.MONGO_URI,
         uuidRepresentation="standard",
@@ -38,6 +40,7 @@ def initialize_mongo_resources():
     mongo_engine = SyncEngine(client=mongo_client, database=settings.MONGO_DB)
     message_crud = MongoCRUD(Message, mongo_engine)
     chatbot_crud = MongoCRUD(FlowNode, mongo_engine)
+    logs_crud = MongoCRUD(Logger, mongo_engine)
 
 def initialize_s3_service():
     global s3_bucket_service
@@ -78,6 +81,11 @@ def get_chatbot_crud():
     if chatbot_crud is None:
         raise RuntimeError("Chatbot CRUD not initialized - worker may not be ready")
     return chatbot_crud
+
+def get_logs_crud():
+    if logs_crud is None:
+        raise RuntimeError("Logs CRUD not initialized - worker may not be ready")
+    return logs_crud
 
 def get_s3_bucket_service():
     if s3_bucket_service is None:

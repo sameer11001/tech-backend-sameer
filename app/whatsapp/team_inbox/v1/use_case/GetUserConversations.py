@@ -1,7 +1,7 @@
 from typing import Optional
 from app.annotations.models.Contact import Contact
 from app.annotations.services.ContactService import ContactService
-from app.core.config.logger import get_logger
+from app.core.logs.logger import get_logger
 
 from app.core.exceptions.custom_exceptions.EntityNotFoundException import EntityNotFoundException
 from app.core.schemas.PageableResponse import PageableResponse
@@ -39,12 +39,12 @@ class GetUserConversations:
             
             conversation_redis_data = await self.redis.get(redis_key)
             
-            conversation_expiration_time = None
+            conversation_expiration_time_value : Optional[str] = None
             
             redis_conversation_expiration_time = RedisHelper.redis_conversation_expired_key(conversation.id)
             redis_expiration_time = await self.redis.get(redis_conversation_expiration_time)    
             if redis_expiration_time:
-                conversation_expiration_time = Helper.conversation_expiration_calculate(redis_expiration_time)
+                conversation_expiration_time_value = Helper.conversation_expiration_calculate(redis_expiration_time)
                 
             assignments = conversation.assignment
             
@@ -53,6 +53,8 @@ class GetUserConversations:
             unread_count = self._extract_unread_count(unread_status)
             
             logger.debug(f"user_id:assignments:{assignments} {conversation.id}")
+            
+            is_conversation_expired = False if conversation_expiration_time_value else True
             
             conversations_data.append(ConversationWithContact(
                 id=conversation.id,
@@ -65,8 +67,8 @@ class GetUserConversations:
                 country_code_phone_number=contact.country_code,
                 last_message=conversation_redis_data['last_message'] if conversation_redis_data else None,
                 last_message_time=conversation_redis_data['last_message_time'] if conversation_redis_data else None,
-                conversation_is_expired= conversation_expiration_time if False else True,
-                conversation_expiration_time=conversation_expiration_time,
+                conversation_is_expired= is_conversation_expired,
+                conversation_expiration_time=conversation_expiration_time_value,
                 unread_count=unread_count
             ))            
         

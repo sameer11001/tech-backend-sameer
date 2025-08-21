@@ -5,7 +5,7 @@ from faststream.rabbit import RabbitQueue,RabbitExchange ,ExchangeType
 from app.core.config.container import Container
 from app.core.config.settings import settings
 from dependency_injector.wiring import Provide, inject
-from app.core.config.logger import get_logger
+from app.core.logs.logger import get_logger
 from app.real_time.socketio.socket_gateway import SocketMessageGateway
 
 rabbitmq_router : RabbitRouter = RabbitRouter(f"{settings.RABBITMQ_URI}")
@@ -87,5 +87,5 @@ async def handle_chatbot_reply_event(payload: dict, socketio : SocketMessageGate
     queue=RabbitQueue(name="test_flow_replies_queue", durable=True, routing_key="test_flow_replies_event"),
     exchange=RabbitExchange(name="test_flow_replies_exchange", type=ExchangeType.DIRECT, durable=True)   
 )
-async def handle_chatbot_reply_event(payload: dict):
+async def handle_test_flow(payload: dict):
     logger.debug(f"{payload}")

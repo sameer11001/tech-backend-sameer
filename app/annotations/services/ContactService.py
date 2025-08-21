@@ -8,7 +8,6 @@ from app.annotations.repositories.ContactRepository import ContactRepository
 from app.core.exceptions.custom_exceptions.EntityNotFoundException import EntityNotFoundException
 from app.core.services.BaseService import BaseService
 from app.utils.Helper import Helper
-from app.utils.enums.SortBy import SortBy
 
 
 
@@ -17,7 +16,7 @@ class ContactService(BaseService[Contact]):
         super().__init__(repository)
         self.repository = repository
         
-    async def get_by_client_id(self, client_id: str, page: int, limit: int, search: Optional[str] = None, sort_by: Optional[SortBy] = None, sort_value: Optional[str] = None):
+    async def get_by_client_id(self, client_id: str, page: int, limit: int, search: Optional[str] = None):
         if page < 1:
             page = 1
         return await self.repository.get_by_client_id(client_id, page, limit, search)

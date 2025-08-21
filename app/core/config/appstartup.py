@@ -1,4 +1,5 @@
 from app.chat_bot.models.ChatBot import FlowNode
+from app.core.logs.loggers import Logger
 from app.whatsapp.broadcast.use_case.BroadcastConfig import BroadcastConfig
 from app.whatsapp.template.models.Template import Template
 from fastapi import FastAPI
@@ -34,10 +35,11 @@ ROLES = [
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     mongo = MongoDB(settings.MONGO_URI, settings.MONGO_DB)
-    await mongo.init_db([Message, Template,FlowNode])     
-    broadcast_config : BroadcastConfig = await Container.broadcast_broadcast_config()
+    await mongo.init_db([Message, Template,FlowNode,Logger])    
+    container = Container()
+    broadcast_config : BroadcastConfig = container.broadcast_broadcast_config()
 
-    db_instance = Container.psql()
+    db_instance = container.psql()
     try:
         await db_instance.init_db()                  
         async with db_instance._session_factory() as db:

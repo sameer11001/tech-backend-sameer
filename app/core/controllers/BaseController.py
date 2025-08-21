@@ -2,7 +2,7 @@ from fastapi import APIRouter, Depends, File, UploadFile
 import fastapi
 from sqlalchemy import text
 from sqlmodel import Session
-from app.core.storage.postgres import PostgresDatabase, provide_session
+from app.core.storage.postgres import PostgresDatabase
 from app.events.pub.WhatsappMessagePublisher import WhatsappMessagePublisher
 from app.core.config.container import Container
 from app.core.schemas.BaseResponse import ApiResponse
@@ -62,8 +62,5 @@ async def test_flow_celery(
 @router.get("/get_users_data", response_model=ApiResponse)
 async def get_users_data():
     db = PostgresDatabase(db_url="postgresql+asyncpg://postgres:password@postgres/db_name")
-    async_session : Session = await provide_session(db_instance=db)
     stmt = text("Select * from users")
-    result = await async_session.exec(stmt)
-    data  = result.fetchone()
-    return ApiResponse.success_response(data=data[0],message="Server is up and running", status_code=200)
+    

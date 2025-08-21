@@ -1,6 +1,8 @@
-from fastapi import APIRouter, Request
+from asyncio.log import logger
+import json
+from fastapi import APIRouter, HTTPException, Header, Request
 from fastapi.params import Depends
-import msgpack
+import msgspec
 
 from app.chat_bot.models.schema.chat_bot_body.DynamicChatBotRequest import DynamicChatBotRequest
 from app.chat_bot.models.schema.request.CreateChatBotRequest import CreateChatBotRequest
@@ -16,16 +18,19 @@ from app.utils.generate_responses import generate_responses
 
 router = APIRouter()
 
-async def parse_msgpack_body(request_body: Request) -> DynamicChatBotRequest:
+        
+async def parse_msgpack_body(request_body: Request):
     raw_body = await request_body.body()
-    
+    logger.debug(raw_body)
     try:
-        unpacked_body = msgpack.unpackb(raw_body, raw=False)
-        return DynamicChatBotRequest(**unpacked_body)
-    except msgpack.exceptions.ExtraData:
-        for unpacked in msgpack.unpack(raw_body):
-            pass
+        json_dict = json.loads(raw_body)
+        
+        ordered_bytes = bytes(json_dict[str(i)] for i in range(len(json_dict)))
+        
+        decoded = msgspec.msgpack.decode(ordered_bytes) 
+        return DynamicChatBotRequest(**decoded)
     except Exception as e:
+        logger.error(e)
         raise ClientException(str(e))
     
 
@@ -36,30 +41,18 @@ async def parse_msgpack_body(request_body: Request) -> DynamicChatBotRequest:
             [UnAuthorizedException, DataBaseException, ClientException]
         )
     },
-    openapi_extra={
-        "requestBody": {
-            "required": True,
-            "content": {
-                "application/x-msgpack": {
-                    "schema": DynamicChatBotRequest.model_rebuild(),
-                    "example": DynamicChatBotRequest.model_json_schema()
-                    
-                }
-            },
-            "description": "Request body in MessagePack format"
-
-        }
-    }
 )
 @inject
 async def add_chat_bot_flow_node(
     request_body: DynamicChatBotRequest = Depends(parse_msgpack_body),
-    add_flow_node: AddFlowNode = Depends(Provide[Container.chat_bot_create_chat_bot]),
+    add_flow_node: AddFlowNode = Depends(Provide[Container.chat_bot_add_flow_node]),
     token: dict = Depends(get_current_user),
 ):
     try:
+        logger.debug(request_body)
+        logger.debug("starting add flow node")
         response = await add_flow_node.execute(
-            business_id=token["business_id"],
+            business_profile_id=token["business_profile_id"],
             request_body=request_body
         )
         return response
@@ -88,7 +81,7 @@ async def create_chat_bot(
 ):
     try:
         response = await create_chat_bot.execute(
-            business_id=token["business_id"],
+            business_profile_id=token["business_profile_id"],
             request_body=request_body,
         )
         return response
@@ -104,3 +97,5 @@ async def create_chat_bot(
 @router.post("/trigger")
 async def trigger_chat_bot():
     pass
+
+

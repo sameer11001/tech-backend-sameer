@@ -1,4 +1,4 @@
-from app.core.config.logger import get_logger
+from app.core.logs.logger import get_logger
 from app.real_time.webhook.services.TemplateHook import TemplateHook
 from fastapi import HTTPException, logger, status
 

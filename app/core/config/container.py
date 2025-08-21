@@ -30,14 +30,21 @@ from app.chat_bot.models.ChatBot import FlowNode
 from app.chat_bot.repositories.ChatBotRepositories import ChatBotRepository
 from app.chat_bot.services.ChatbotContextService import ChatbotContextService
 from app.chat_bot.services.ChatBotService import ChatBotService
+from app.chat_bot.v1.use_case.AddFlowNode import AddFlowNode
 from app.chat_bot.v1.use_case.CreateChatBot import CreateChatBot
 from app.chat_bot.v1.use_case.DeleteChatBot import DeletChatBot
+from app.core.exceptions.ErrorHandler import ErrorHandler
+from app.core.logs.LogCRUD import LogCRUD
+from app.core.logs.LoggingBaseMiddleWare import LoggingMiddleware
+from app.core.logs.SystemLogService import SystemLogService
+from app.core.services.HTTPClient import EnhancedHTTPClient
+from app.core.services.HTTPService import HTTPService
 from app.events.pub.ChatBotTriggerPublisher import ChatBotTriggerPublisher
 from app.events.pub.ChatbotFlowPublisher import ChatbotFlowPublisher
 from app.events.pub.MessageBroadcastPublisher import MessageBroadcastPublisher
 from app.core.broker.RabbitMQBroker import RabbitMQBroker,RabbitMQSettings
+from app.events.pub.SystemLogsPublisher import SystemLogsPublisher
 from app.events.pub.WhatsappMessagePublisher import  WhatsappMessagePublisher
-from app.core.exceptions.ErrorHandler import raise_for_status
 
 from app.core.repository.MongoRepository import MongoCRUD
 from app.core.services.S3Service import S3Service
@@ -107,7 +114,7 @@ from app.user_management.auth.v1.use_case.TokenRefresh import TokenRefresh
 from app.user_management.auth.v1.use_case.UserLogin import UserLogin
 from app.user_management.auth.v1.use_case.UserLogout import UserLogout
 from app.core.config.settings import Settings
-from app.core.storage.postgres import PostgresDatabase, provide_session
+from app.core.storage.postgres import PostgresDatabase, create_session
 from app.user_management.user.repositories.ClientRepository import ClientRepository
 from app.user_management.user.repositories.TeamRepository import TeamRepository
 from app.user_management.user.services.ClientService import ClientService
@@ -158,7 +165,7 @@ class Container(containers.DeclarativeContainer):
     config = providers.Configuration()
     config.from_pydantic(Settings())
     
-    redis_manager = providers.Singleton(
+    socket_redis_manager = providers.Singleton(
         AsyncRedisManager,
         url = config.CACHE_URL
     )
@@ -167,11 +174,11 @@ class Container(containers.DeclarativeContainer):
     sio: AsyncServer= providers.Singleton(
         AsyncServer,
         async_mode="asgi",
-        client_manager=redis_manager,
+        client_manager=socket_redis_manager,
         cors_allowed_origins=["http://localhost:4200"],
         transports=['websocket'],
-        logger=False,    
-        engineio_logger=False,
+        logger=True,    
+        engineio_logger=True,
     )
     
     #----- AWS Config -----
@@ -215,14 +222,17 @@ class Container(containers.DeclarativeContainer):
     
     #----- STORAGE Config -----
     psql = providers.Singleton(PostgresDatabase, db_url = config.POSTGRES_DATABASE_URL)
-    session = providers.Resource(provide_session, db_instance=psql)
-    
+    session = providers.Factory(
+        lambda db_instance: db_instance.create_session(),        
+        db_instance=psql
+    )
 
-    http_client = providers.Singleton(httpx.AsyncClient, event_hooks={'response': [raise_for_status]}, timeout=120)
-    
+    http_client = providers.Singleton(httpx.AsyncClient, timeout=120)
+
     mongo_crud_message = providers.Singleton(MongoCRUD, model = Message) 
     mongo_crud_template = providers.Singleton(MongoCRUD, model = Template) 
     mongo_crud_chat_bot = providers.Singleton(MongoCRUD, model=FlowNode)
+    log_crud = providers.Singleton(LogCRUD)
     
     rabbitmq_settings = providers.Singleton(
         RabbitMQSettings,
@@ -254,6 +264,7 @@ class Container(containers.DeclarativeContainer):
     message_broadcast_publisher = providers.Singleton(MessageBroadcastPublisher, connection=rabbitmq_connection)
     chat_bot_trigger_publisher = providers.Singleton(ChatBotTriggerPublisher, connection=rabbitmq_connection)
     chat_bot_flow_publisher = providers.Singleton(ChatbotFlowPublisher, connection=rabbitmq_connection)
+    system_logs_publisher = providers.Singleton(SystemLogsPublisher, connection=rabbitmq_connection)
     test_publisher = providers.Singleton(TestPublisher, connection=rabbitmq_connection)
     
     #----- REPOSITORIES -----
@@ -292,7 +303,17 @@ class Container(containers.DeclarativeContainer):
     note_service = providers.Factory(NoteService, repository = note_repository)
     chat_bot_service = providers.Factory(ChatBotService, repository = chat_bot_repository)
     chat_bot_context_service = providers.Singleton(ChatbotContextService, redis_service = async_redis_service)
-    
+    system_log_service = providers.Singleton(SystemLogService, log_publisher = system_logs_publisher)
+
+    http_client = providers.Singleton(
+        EnhancedHTTPClient,
+        client=http_client,
+        log_service=system_log_service  
+    )
+    http_service = providers.Singleton(
+        HTTPService,
+        enhanced_client=http_client
+    )
     #----- API -----
     business_profile_api = providers.Singleton(BusinessProfileApi, client = http_client)
     whatsapp_template_api = providers.Singleton(WhatsAppTemplateApi, client = http_client)
@@ -406,5 +427,10 @@ class Container(containers.DeclarativeContainer):
     webhook_dispatcher = providers.Factory(WebhookDispatcher, message_hook = message_hook, template_hook = template_hook)
     
     #----- ChatBot -----
-    chat_bot_create_chat_bot = providers.Factory(CreateChatBot, chat_bot_service = chat_bot_service, business_service = business_profile_service,whatsapp_media_api = whatsapp_media_api,s3_bucket_service = s3_bucket_service, aws_region = config.AWS_REGION, aws_s3_bucket_name = config.S3_BUCKET_NAME, mongo_crud_chat_bot = mongo_crud_chat_bot)
+    chat_bot_create_chat_bot = providers.Factory(CreateChatBot, chat_bot_service = chat_bot_service, business_service = business_profile_service)
     chat_bot_delete_chat_bot = providers.Factory(DeletChatBot, chat_bot_service = chat_bot_service)
+    chat_bot_add_flow_node = providers.Factory(AddFlowNode, chat_bot_service = chat_bot_service, business_service = business_profile_service,whatsapp_media_api = whatsapp_media_api,s3_bucket_service = s3_bucket_service, aws_region = config.AWS_REGION, aws_s3_bucket_name = config.S3_BUCKET_NAME, mongo_crud_chat_bot = mongo_crud_chat_bot)
+    
+    #----- error and logger -----
+    error_handler = providers.Singleton(ErrorHandler, log_service = system_log_service)    
+

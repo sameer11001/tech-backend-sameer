@@ -5,7 +5,7 @@ from app.annotations.services.ContactService import ContactService
 from app.chat_bot.services.ChatbotContextService import ChatbotContextService
 from app.events.pub.ChatbotFlowPublisher import ChatbotFlowPublisher
 from app.events.pub.WhatsappMessagePublisher import WhatsappMessagePublisher
-from app.core.config.logger import get_logger
+from app.core.logs.logger import get_logger
 from app.core.repository.MongoRepository import MongoCRUD
 from app.core.storage.redis import AsyncRedisService
 from app.real_time.socketio.socket_gateway import SocketMessageGateway
@@ -17,6 +17,7 @@ from app.whatsapp.business_profile.v1.models.BusinessProfile import BusinessProf
 from app.whatsapp.business_profile.v1.services.BusinessProfileService import BusinessProfileService
 from app.utils.Helper import Helper
 from app.whatsapp.team_inbox.models.Assignment import Assignment
+from app.whatsapp.team_inbox.models.schema.response.ConversationWithContact import ConversationWithContact
 from app.whatsapp.team_inbox.models.Conversation import Conversation
 from app.whatsapp.team_inbox.models.ConversationTeamLink import ConversationTeamLink
 from app.whatsapp.team_inbox.models.Message import Message
@@ -103,7 +104,7 @@ class MessageHook:
             await self._handle_context(data, msg)
             
             conversation: Conversation = await self.get_or_create_conversation(
-                msg["from"], f'+{display_number}', contact_info
+                msg["from"], f'+{display_number}', contact_info, profile.id
             )
             
             msg_type = msg.get("type")
@@ -333,7 +334,7 @@ class MessageHook:
             data["context"] = None
 
     async def get_or_create_conversation(
-        self, from_number: str, client_number: str, contact_info: Dict[str, Any],
+        self, from_number: str, client_number: str, contact_info: Dict[str, Any],business_profile_id: str
     ) -> Conversation:
         convo: Conversation = await self.conversation_service.find_by_contact_and_client_number(
             contact_phone_number=from_number, client_phone_number=client_number,
@@ -381,7 +382,23 @@ class MessageHook:
             conversation=conversation, team=default_team
         )
         conversation.teams.append(conversation_team_link)
-        return await self.conversation_service.create(conversation)
+        conversation_created = await self.conversation_service.create(conversation)
+        conversation_body = ConversationWithContact(
+            id=str(conversation_created.id),
+            contact_id=str(contact.id),
+            client_id=str(client.id),
+            status=conversation_created.status,
+            is_open=conversation_created.is_open,
+            user_assignments_id=assign.id,
+            contact_name=contact.name,
+            contact_phone_number=contact.phone_number,
+            country_code_phone_number=contact.country_code,
+            conversation_is_expired = False,
+            conversation_expiration_time = "23:59:59",
+            unread_count=0
+        )
+        await self.socket_message.emit_create_new_conversation(conversation_body, business_profile_id)
+        return conversation_created
 
     async def _set_conversation_expiration(self, conversation_id: Any) -> None:
         tomorrow = datetime.now(timezone.utc) + timedelta(days=1)
