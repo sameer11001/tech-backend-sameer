@@ -46,9 +46,7 @@ class UploadMedia:
         s3_key = self.s3_bucket_service.upload_fileobj(
             file=file.file, file_name=file.filename
         )
-        cdn_url = (
-            f"https://{self.aws_s3_bucket_name}.s3.{self.aws_region}.amazonaws.com/{s3_key}"
-        )
+        cdn_url = self.s3_bucket_service.get_cdn_url(s3_key)
 
         file.file.seek(0)
         wp_response = await self.whatsapp_media_api.upload_media(

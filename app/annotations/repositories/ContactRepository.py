@@ -9,6 +9,7 @@ from app.core.repository.BaseRepository import BaseRepository
 from app.annotations.models.Contact import Contact
 from app.annotations.models.ContactAttributeLink import ContactAttributeLink
 from app.annotations.models.ContactTagLink import ContactTagLink
+from app.utils.enums.SortBy import SortByCreatedAt
 from app.whatsapp.business_profile.v1.models.BusinessProfile import BusinessProfile
 
 class ContactRepository(BaseRepository[Contact]):
@@ -16,7 +17,7 @@ class ContactRepository(BaseRepository[Contact]):
         super().__init__(Contact, session)
 
     async def get_by_client_id(
-        self, client_id: str, page: int, limit: int, search: Optional[str] = None
+        self, client_id: str, page: int, limit: int, search: Optional[str] = None, sort: Optional[SortByCreatedAt] = None
     ):
         async with self.session as db_session:
             try:
@@ -34,6 +35,9 @@ class ContactRepository(BaseRepository[Contact]):
                     name_filter = Contact.name.ilike(f"%{search}%")
                     query = query.where(name_filter)
                     count_query = count_query.where(name_filter)
+                
+                if sort == SortByCreatedAt.ASC:
+                    query = query.order_by(Contact.created_at.asc())
                 else:
                     query = query.order_by(Contact.created_at.desc())
 

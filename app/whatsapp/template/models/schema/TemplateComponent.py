@@ -18,19 +18,29 @@ class URLButton(BaseModel):
 class PhoneNumberButton(BaseModel):
     type: Literal["PHONE_NUMBER"]
     index: Optional[int] = None
+    text: str
     phone_number: str
 
+class CopyCodeButton(BaseModel):
+    type: Literal["COPY_CODE"]
+    index: Optional[int] = None
+    example: str
+
+class OTPButton(BaseModel):
+    type: Literal["OTP"]
+    otp_type: Literal["COPY_CODE"]
+
 Button = Annotated[
-    Union[QuickReplyButton, URLButton, PhoneNumberButton],
+    Union[QuickReplyButton, URLButton, PhoneNumberButton, CopyCodeButton, OTPButton], 
     Field(discriminator="type")
 ]
 
 class TemplateComponent(BaseModel):
     type:     ComponentTypeEnum
-    format:   Optional[HeaderFormatEnum] = None   # only for HEADER
-    text:     Optional[str]                  = None   # only for HEADER, BODY, FOOTER
-    example:  Optional[dict]            = None  # required for TEXT header & BODY
-    buttons:  Optional[List[Button]]         = None   # only for BUTTON
+    format:   Optional[HeaderFormatEnum] = None  
+    text:     Optional[str] = None   
+    example:  Optional[dict] = None  
+    buttons:  Optional[List[Button]] = None   
 
     @model_validator(mode="before")
     def check_required_fields(cls, values):

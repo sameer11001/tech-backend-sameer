@@ -4,6 +4,7 @@ from typing import Any, Dict, List, Optional
 from app.annotations.services.ContactService import ContactService
 from app.chat_bot.services.ChatbotContextService import ChatbotContextService
 from app.events.pub.ChatbotFlowPublisher import ChatbotFlowPublisher
+from app.events.pub.MessageReceivedPublisher import MessageHookReceivedPublisher
 from app.events.pub.WhatsappMessagePublisher import WhatsappMessagePublisher
 from app.core.logs.logger import get_logger
 from app.core.repository.MongoRepository import MongoCRUD
@@ -49,6 +50,7 @@ class MessageHook:
         socket_message: SocketMessageGateway,
         mongo_message: MongoCRUD[Message],
         s3_service: S3Service,
+        message_hook_received_publisher: MessageHookReceivedPublisher,
         aws_s3_bucket: str,
         aws_region: str,
     ):
@@ -66,6 +68,7 @@ class MessageHook:
         self.socket_message = socket_message
         self.mongo_message = mongo_message
         self.s3_service = s3_service
+        self.message_hook_received_publisher = message_hook_received_publisher
         self.aws_s3_bucket = aws_s3_bucket
         self.aws_region = aws_region
         self.chatbot_context_service = chatbot_context_service
@@ -136,10 +139,10 @@ class MessageHook:
                                          operation='process_conversation')
             
             msg_type = msg.get("type")
-            if msg_type == "interactive":
-                await self._handle_chatbot_interaction(msg, conversation, data, conv_logger)
-            elif msg_type == "text":
-                await self._handle_text_response_to_chatbot(msg, conversation, data, conv_logger)
+            # if msg_type == "interactive":
+            #     await self._handle_chatbot_interaction(msg, conversation, data, conv_logger)
+            # elif msg_type == "text":
+            #     await self._handle_text_response_to_chatbot(msg, conversation, data, conv_logger)
             
             await conv_logger.ainfo("Message data processed", message_type=msg_type)
             await self.socket_message.emit_received_message(
@@ -288,7 +291,7 @@ class MessageHook:
             filename = media.get("filename") or f"{media_id}.{self._get_file_extension(media.get('mime_type'))}"
 
             s3_key = self.s3_service.upload_fileobj(file=file_stream, file_name=filename)
-            cdn_url = f"https://{self.aws_s3_bucket}.s3.{self.aws_region}.amazonaws.com/{s3_key}"
+            cdn_url = self.s3_service.get_cdn_url(s3_key)
 
             base_content = {
                 "media_id": media_id,
@@ -404,16 +407,11 @@ class MessageHook:
             )
             await logger.ainfo("Created new contact", contact_id=str(contact.id))
         
-        assign = await self.assignment_service.create(
-            Assignment(user_id="0198ce0f-7d5e-70b6-9bec-af62fc5d47d1", assigned_by="0198ce0f-7d5e-70b6-9bec-af62fc5d47d1")
-        )
-        
         default_team: Team = await self.team_service.get_default_team_by_client_id(client.id)
 
         conversation: Conversation = Conversation(
             contact_id=contact.id,
             client_id=client.id,
-            assignment_id=assign.id,
             status=ConversationStatus.OPEN,
             is_open=True,
             chatbot_triggered=True
@@ -429,7 +427,6 @@ class MessageHook:
             client_id=str(client.id),
             status=conversation_created.status,
             is_open=conversation_created.is_open,
-            user_assignments_id=assign.id,
             contact_name=contact.name,
             contact_phone_number=contact.phone_number,
             country_code_phone_number=contact.country_code,

@@ -96,7 +96,6 @@ class SocketMessageGateway:
         await self.redis.expire(RedisHelper.redis_conversation_members_key(conversation_id), 3600)
 
     async def _remove_user_from_conversation(self, sid: str, conversation_id: str):
-        # Replace pipeline with direct calls
         await self.redis.delete(RedisHelper.redis_conversation_user_session_key(conversation_id, sid))
         await self.redis.srem(RedisHelper.redis_conversation_members_key(conversation_id), sid)
 
@@ -254,7 +253,7 @@ class SocketMessageGateway:
             conversations = await self._get_user_conversations(sid)
             for conversation_id in conversations:
                 try:
-                    await self.sio.leave_room(sid=sid, room=conversation_id)
+                    await self.sio.leave_room(sid=sid, room=str(conversation_id))
                 except Exception:
                     pass
             
@@ -479,7 +478,7 @@ class SocketMessageGateway:
     async def emit_received_message(self, message: dict, phone_number_id: str, conversation_id: str = None):
         logger = self._get_logger("system", component="message_emit", 
                                 phone_number_id=phone_number_id, 
-                                conversation_id=conversation_id,
+                                conversation_id=str(conversation_id),
                                 message_id=message.get("message_id"))
         
         try:
@@ -497,7 +496,7 @@ class SocketMessageGateway:
                 "context": message.get("context") if message.get("context") else "",
                 "is_from_contact": "true",  
                 "message_status": "received", 
-                "conversation_id": conversation_id,
+                "conversation_id": str(conversation_id),
             }
             
             redis_stream_message_id = await self.redis.xadd(
@@ -530,12 +529,12 @@ class SocketMessageGateway:
                         "context": message.get("context"),
                         "is_from_contact": True,
                         "message_status": "delivered",
-                        "conversation_id": conversation_id,
+                        "conversation_id": str(conversation_id),
                         "redis_stream_id": redis_stream_message_id
                     },
-                    "conversation_id": conversation_id
+                    "conversation_id": str(conversation_id)
                 }
-                await self.sio.emit(event="conversation_message_received", data=message_data, room=conversation_id)
+                await self.sio.emit(event="conversation_message_received", data=message_data, room=str(conversation_id))
             
             await logger.ainfo("Message emitted successfully to all recipients")
             
@@ -589,7 +588,7 @@ class SocketMessageGateway:
 
     async def emit_conversation_assignment(self, user_id: str, conversation_id: str, assigned_to: str, assignment_message: dict):
         logger = self._get_logger("system", component="conversation_assignment",
-                                conversation_id=conversation_id,
+                                conversation_id=str(conversation_id),
                                 user_id=user_id,
                                 assigned_to=assigned_to)
         
@@ -640,7 +639,7 @@ class SocketMessageGateway:
 
     async def emit_conversation_status(self, user_id: str, conversation_id: str, status: str):
         logger = self._get_logger("system", component="conversation_status",
-                                conversation_id=conversation_id,
+                                conversation_id=str(conversation_id),
                                 user_id=user_id,
                                 status=status)
         

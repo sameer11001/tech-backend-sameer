@@ -4,6 +4,7 @@ from app.core.services.BaseService import BaseService
 from app.user_management.user.models.User import User
 from app.user_management.user.repositories.UserRepository import UserRepository
 from app.core.exceptions.custom_exceptions.EntityNotFoundException import EntityNotFoundException
+from app.utils.enums.SortBy import SortByCreatedAt
 
 
 class UserService(BaseService[User]):
@@ -19,8 +20,8 @@ class UserService(BaseService[User]):
             raise ConflictException()
         return user
     
-    async def get_users_by_client_id(self, client_id: str,query: str, page: int, limit: int):
-        users = await self.repository.get_users_by_client_id(client_id, query, page, limit)
+    async def get_users_by_client_id(self, client_id: str,query: str, page: int, limit: int, sort_by: Optional[SortByCreatedAt] = None):
+        users = await self.repository.get_users_by_client_id(client_id, query, page, limit, sort_by)
         return users
 
     async def get_users_by_client_id_count(self, client_id: str) -> int:

@@ -1,5 +1,6 @@
 from asyncio.log import logger
 import json
+from typing import Optional
 from fastapi import APIRouter, HTTPException, Header, Request
 from fastapi.params import Depends
 import msgspec
@@ -8,6 +9,7 @@ from app.chat_bot.models.schema.chat_bot_body.DynamicChatBotRequest import Dynam
 from app.chat_bot.models.schema.request.CreateChatBotRequest import CreateChatBotRequest
 from app.chat_bot.v1.use_case.AddFlowNode import AddFlowNode
 from app.chat_bot.v1.use_case.CreateChatBot import CreateChatBot
+from app.chat_bot.v1.use_case.GetChatBots import GetChatBots
 from app.core.config.container import Container
 from app.core.exceptions.custom_exceptions.ClientExceptionHandler import ClientException
 from app.core.exceptions.custom_exceptions.DataBaseException import DataBaseException
@@ -17,6 +19,69 @@ from dependency_injector.wiring import inject, Provide
 from app.utils.generate_responses import generate_responses
 
 router = APIRouter()
+
+@router.get(
+    "/",
+    responses={
+        **generate_responses(
+            [UnAuthorizedException, DataBaseException, ClientException]
+        )
+    },
+)
+@inject
+async def get_chat_bots(
+    token: dict = Depends(get_current_user),
+    page: int = 1,
+    limit: int = 10,
+    search_query: Optional[str] = None,
+    get_chat_bots: GetChatBots = Depends(Provide[Container.chat_bot_get_chat_bots]),
+):
+    try:
+        response = await get_chat_bots.execute(
+            user_id=token["userId"], 
+            page=page, 
+            limit=limit, 
+            search_query=search_query
+            )
+        return response
+    except UnAuthorizedException as e:
+        raise e
+    except DataBaseException as e:
+        raise e
+    except ClientException as e:
+        raise e
+    except Exception as e:
+        raise ClientException(str(e))
+    
+
+@router.post(
+    "/",
+    responses={
+        **generate_responses(
+            [UnAuthorizedException, DataBaseException, ClientException]
+        )
+    },
+)
+@inject
+async def create_chat_bot(
+    request_body: CreateChatBotRequest,
+    create_chat_bot: CreateChatBot = Depends(Provide[Container.chat_bot_create_chat_bot]),
+    token: dict = Depends(get_current_user),
+):
+    try:
+        response = await create_chat_bot.execute(
+            business_profile_id=token["business_profile_id"],
+            request_body=request_body,
+        )
+        return response
+    except UnAuthorizedException as e:
+        raise e
+    except DataBaseException as e:
+        raise e
+    except ClientException as e:
+        raise e
+    except Exception as e:
+        raise ClientException(str(e))
 
 @router.post(
     "/add_flow_node",
@@ -38,35 +103,6 @@ async def add_chat_bot_flow_node(
         response = await add_flow_node.execute(
             business_profile_id=token["business_profile_id"],
             request_body=request_body
-        )
-        return response
-    except UnAuthorizedException as e:
-        raise e
-    except DataBaseException as e:
-        raise e
-    except ClientException as e:
-        raise e
-    except Exception as e:
-        raise ClientException(str(e))
-
-@router.post(
-    "/",
-    responses={
-        **generate_responses(
-            [UnAuthorizedException, DataBaseException, ClientException]
-        )
-    },
-)
-@inject
-async def create_chat_bot(
-    request_body: CreateChatBotRequest,
-    create_chat_bot: CreateChatBot = Depends(Provide[Container.chat_bot_create_chat_bot]),
-    token: dict = Depends(get_current_user),
-):
-    try:
-        response = await create_chat_bot.execute(
-            business_profile_id=token["business_profile_id"],
-            request_body=request_body,
         )
         return response
     except UnAuthorizedException as e:

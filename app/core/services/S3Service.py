@@ -58,3 +58,7 @@ class S3Service:
             self._head_object(key)
         params = {"Bucket": self.bucket, "Key": key}
         return self.s3_client.generate_presigned_url(operation, Params=params, ExpiresIn=expires_in)
+    
+    def get_cdn_url(self, key: str) -> str:
+
+        return f"https://{self.aws_s3_bucket_name}.s3.{self.aws_region}.amazonaws.com/{key}"

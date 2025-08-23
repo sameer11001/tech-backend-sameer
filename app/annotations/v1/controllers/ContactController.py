@@ -12,6 +12,7 @@ from app.core.config.container import Container
 from app.core.exceptions.GlobalException import GlobalException
 from app.core.schemas.BaseResponse import ApiResponse
 from app.core.security.JwtUtility import get_current_user
+from app.utils.enums.SortBy import SortByCreatedAt
 
 router = APIRouter()
 
@@ -21,11 +22,12 @@ async def get_contacts(
                         page: int = 1,
                         limit: int = 10,
                         search: Optional[str] = None,
+                        sort_by: Optional[SortByCreatedAt] = None,
                         token: dict = Depends(get_current_user),
                         get_contacts: GetContacts = Depends(Provide[Container.contact_get_contacts])):
     try:
         return ApiResponse.success_response(data = await get_contacts.execute(token["userId"], 
-                                            page, limit, search)) 
+                                            page, limit, search,sort_by)) 
     except GlobalException as e:
         raise e
     except Exception as e:

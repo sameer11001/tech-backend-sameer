@@ -13,7 +13,7 @@ class DynamicTemplateRequest(BaseModel):
     language: str = Field(..., min_length=2, max_length=10)
     
     header: Optional[DynamicHeaderRequest] = None
-    body: DynamicBodyRequest
+    body: Optional[DynamicBodyRequest] = None
     footer: Optional[DynamicFooterRequest] = None
     buttons: Optional[List[DynamicButtonRequest]] = None
     

@@ -70,7 +70,11 @@ class CreateTemplateRequest(BaseModel):
                                 "type": "BUTTONS",
                                 "buttons": [
                                     {"type": "URL", "index": 0, "text": "Shop Now", "url": "https://example.com/deal"},
-                                    {"type": "QUICK_REPLY", "index": 1, "text": "Tell me more"}
+                                    {"type": "QUICK_REPLY", "index": 1, "text": "Tell me more"},
+                                    {"type": "PHONE_NUMBER", "index": 2, "text": "Contact Support", "phone_number": "+1234567890"},
+                                    {"type": "COPY_CODE" , "index": 3, "example": "123456"},
+                                    {"type": "OTP" , "index": 4, "otp_type": "COPY_CODE"},
+
                                 ]
                             }
                         ]

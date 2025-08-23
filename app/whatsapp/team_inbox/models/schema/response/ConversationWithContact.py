@@ -7,7 +7,7 @@ from app.whatsapp.team_inbox.utils.conversation_status import ConversationStatus
 class ConversationWithContact(BaseModel):
     id: UUID
     status: Optional[ConversationStatus]
-    user_assignments_id: UUID
+    user_assignments_id: Optional[UUID] = None
     client_id: UUID
     contact_id: UUID
     contact_name: Optional[str]

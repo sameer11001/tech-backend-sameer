@@ -8,6 +8,8 @@ from sqlmodel import  select
 from sqlalchemy.exc import SQLAlchemyError
 from sqlmodel.ext.asyncio.session import AsyncSession
 
+from app.utils.enums.SortBy import SortByCreatedAt
+
 class UserRepository(BaseRepository[User]):
     def __init__(self, session : AsyncSession):
         
@@ -16,9 +18,6 @@ class UserRepository(BaseRepository[User]):
         super().__init__(model=User, session=session)
 
     async def get_by_email(self, email: str) -> Optional[User]:
-        print(f"this is the get_by_email{self.session_manager}")
-        print(f"this is the get_by_email{self.session}")
-
         async with self.session_manager as db_session:
             try:
                 statement = select(self.model).where(self.model.email == email)
@@ -28,15 +27,17 @@ class UserRepository(BaseRepository[User]):
                 raise DataBaseException(str(e))
             
     async def get_users_by_client_id(
-        self, client_id: str, query: str, page: int, limit: int
+        self, client_id: str, query: str, page: int, limit: int, sort_by: Optional[SortByCreatedAt]
     ) -> Dict[str, Union[List[User], int]]:
-        print(f"this is the get_users_by_client_id{self.session_manager}")
-        print(f"this is the get_users_by_client_id{self.session}")
         async with self.session_manager as db_session:
             try:
-                base_query = select(self.model).where(self.model.client_id == client_id).order_by(
-                    self.model.created_at.desc()
-                )
+                base_query = select(self.model).where(self.model.client_id == client_id)
+                
+                if sort_by == SortByCreatedAt.ASC:
+                    base_query = base_query.order_by(self.model.created_at)
+                elif sort_by == SortByCreatedAt.DESC:
+                    base_query = base_query.order_by(self.model.created_at.desc())
+                    
                 if query:
                     base_query = base_query.where(
                         or_(

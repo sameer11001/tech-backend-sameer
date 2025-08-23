@@ -49,22 +49,50 @@ class TemplateValidator:
     @staticmethod
     def _validate_header(header: DynamicHeaderRequest) -> List[str]:
         errors = []
+        limits = TemplateValidator.WHATSAPP_LIMITS
+        
         if header.format == TemplateFormat.TEXT:
-            if header.text and len(header.text) > TemplateValidator.WHATSAPP_LIMITS['header_text_max_length']:
-                errors.append(f"Header text exceeds {TemplateValidator.WHATSAPP_LIMITS['header_text_max_length']} characters")
-            if header.variables and len(header.variables) > TemplateValidator.WHATSAPP_LIMITS['max_variables_per_component']:
-                errors.append(f"Header has too many variables (max {TemplateValidator.WHATSAPP_LIMITS['max_variables_per_component']})")
+            if header.text and len(header.text) > limits['header_text_max_length']:
+                errors.append(
+                    f"Header text exceeds {limits['header_text_max_length']} characters"
+                )
+            
+            if header.variablesMap:
+                if len(header.variablesMap) > limits['max_variables_per_component']:
+                    errors.append(
+                        f"Header has too many variables (max {limits['max_variables_per_component']})"
+                    )
+                
+                for idx, var in enumerate(header.variablesMap, start=1):
+                    if "param_name" not in var or not var["param_name"].strip():
+                        errors.append(f"Header variable {idx} is missing 'param_name'")
+                    if "example" not in var or not var["example"].strip():
+                        errors.append(f"Header variable {idx} is missing 'example'")
+        
         return errors
     
     @staticmethod
     def _validate_body(body: DynamicBodyRequest) -> List[str]:
         errors = []
-        if len(body.text) > TemplateValidator.WHATSAPP_LIMITS['body_text_max_length']:
-            errors.append(f"Body text exceeds {TemplateValidator.WHATSAPP_LIMITS['body_text_max_length']} characters")
-        if body.variables and len(body.variables) > TemplateValidator.WHATSAPP_LIMITS['max_variables_per_component']:
-            errors.append(f"Body has too many variables (max {TemplateValidator.WHATSAPP_LIMITS['max_variables_per_component']})")
+        limits = TemplateValidator.WHATSAPP_LIMITS
+        
+        if len(body.text) > limits['body_text_max_length']:
+            errors.append(f"Body text exceeds {limits['body_text_max_length']} characters")
+        
+        if body.variablesMap:
+            if len(body.variablesMap) > limits['max_variables_per_component']:
+                errors.append(
+                    f"Body has too many variables (max {limits['max_variables_per_component']})"
+                )
+            
+            for idx, var in enumerate(body.variablesMap, start=1):
+                if "param_name" not in var or not var["param_name"].strip():
+                    errors.append(f"Body variable {idx} is missing 'param_name'")
+                if "example" not in var or not var["example"].strip():
+                    errors.append(f"Body variable {idx} is missing 'example'")
+        
         return errors
-    
+
     @staticmethod
     def _validate_footer(footer: DynamicFooterRequest) -> List[str]:
         errors = []
@@ -88,12 +116,8 @@ class TemplateValidator:
     def _validate_template_structure(template_request: DynamicTemplateRequest) -> List[str]:
         errors = []
         
-        if template_request.category == "AUTHENTICATION":
-            if not template_request.buttons or not any(b.type == ButtonType.OTP for b in template_request.buttons):
-                errors.append("Authentication templates must include an OTP button")
-        
         if template_request.category == "MARKETING":
-            if not template_request.buttons or not any(b.type in [ButtonType.URL, ButtonType.PHONE_NUMBER] for b in template_request.buttons):
+            if not template_request.buttons or not any(b.type in [ButtonType.URL, ButtonType.PHONE_NUMBER, ButtonType.QUICK_REPLY, ButtonType.COPY_CODE] for b in template_request.buttons):
                 errors.append("Marketing templates should include at least one call-to-action button")
         
         return errors

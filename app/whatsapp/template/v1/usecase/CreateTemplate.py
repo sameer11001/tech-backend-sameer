@@ -13,9 +13,9 @@ from app.whatsapp.template.enums.ComponentTypeEnum import ComponentTypeEnum
 from app.whatsapp.template.external_services.WhatsAppTemplateApi import WhatsAppTemplateApi
 from app.whatsapp.template.models.Template import Template
 from app.whatsapp.template.models.TemplateMeta import TemplateMeta
-from app.whatsapp.template.models.schema.request.CreateTemplateRequest import CreateTemplateRequest, TemplateComponent
 from app.core.repository.MongoRepository import MongoCRUD
 from app.whatsapp.template.models.schema.template_body.DynamicTemplateRequest import DynamicTemplateRequest
+from app.whatsapp.template.models.schema.template_builder.AuthenticationTemplateBuilder import AuthenticationTemplateBuilder
 from app.whatsapp.template.models.schema.template_builder.TemplateValidator import TemplateValidator
 from app.whatsapp.template.models.schema.template_builder.WhatsAppTemplateBuilder import WhatsAppTemplateBuilder
 from app.whatsapp.template.services.TemplateService import TemplateService
@@ -52,8 +52,12 @@ class CreateTemplate:
         business_profile: BusinessProfile = await self.business_profile_service.get_by_client_id(
             client.id
         )
-        template_request_payload = WhatsAppTemplateBuilder.build_template(template_request)
         
+        if template_request.category == "AUTHENTICATION":
+            template_request_payload = AuthenticationTemplateBuilder.build_template(template_request)
+        else:
+            template_request_payload = WhatsAppTemplateBuilder.build_template(template_request)
+
         logger.logger.debug(f"Creating template: {template_request_payload.model_dump_json(exclude_none=True)}")
         
         create_response = await self.whatsapp_template_api.create_template(

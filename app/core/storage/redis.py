@@ -427,6 +427,13 @@ class AsyncRedisService:
         raw = await self._client.smembers(self._key(key))
         return {self._deserialize(v, use_json=use_json) for v in raw}
     
+    async def sismember(self, key: str, value: Any, use_json: bool = False) -> bool:
+        if isinstance(value, str) and not use_json:
+            return await self._client.sismember(key, value)
+        else:
+            serialized_value = self._serialize(value, use_json=use_json)
+            return await self._client.sismember(key, serialized_value)    
+        
     async def scard(self, key: str) -> int:
         return await self._client.scard(self._key(key))
     

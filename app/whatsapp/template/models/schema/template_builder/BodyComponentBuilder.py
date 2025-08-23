@@ -8,22 +8,21 @@ class BodyComponentBuilder(ComponentBuilder):
     def build(self, body_data: DynamicBodyRequest) -> Dict[str, Any]:
         component = {
             "type": ComponentTypeEnum.BODY.value,
-            "text": self._process_variables(body_data.text, body_data.variables)
+            "text": body_data.text,
         }
         
-        if body_data.variables:
+        if body_data.variablesMap:
             component["example"] = {
-                "body_text": [body_data.variables]
+                "body_text_named_params": [
+                    {
+                        "param_name": var["param_name"].lower(),
+                        "example": var["example"]
+                    }
+                    for var in body_data.variablesMap
+                    if "param_name" in var and "example" in var
+                ]
             }
-        
+
         return component
+        
     
-    def _process_variables(self, text: str, variables: List[str]) -> str:
-        if not variables:
-            return text
-        
-        processed_text = text
-        for i, var in enumerate(variables, 1):
-            processed_text = processed_text.replace(f"{{{var}}}", f"{{{{{i}}}}}")
-        
-        return processed_text

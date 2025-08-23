@@ -132,7 +132,7 @@ class MediaMessage:
             message_created_data = await self.message_service.create(message_meta_data)
             
             content_data = {
-                "cdn_url": f"https://{self.aws_s3_bucket_name}.s3.{self.aws_region}.amazonaws.com/{file_s3_key}",
+                "cdn_url": self.s3_bucket_service.get_cdn_url(file_s3_key),
                 "caption": caption,
                 "media_id": media_id,
                 "file_name": file_name,

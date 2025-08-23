@@ -19,6 +19,7 @@ from app.core.exceptions.GlobalException import GlobalException
 from app.core.schemas.BaseResponse import ApiResponse
 from app.user_management.user.v1.use_case.DeleteUserById import DeleteUserById
 from app.user_management.user.v1.use_case.GetUsersByClientId import GetUsersByClientId
+from app.utils.enums.SortBy import SortByCreatedAt
 from app.utils.generate_responses import generate_responses
 
 router = APIRouter()
@@ -69,6 +70,7 @@ async def get_users(
     query: str = Query(None, description="Search query"),
     page: int = Query(1, description="Page number"),
     limit: int = Query(10, description="Number of items per page"),
+    sort_by: SortByCreatedAt = Query(SortByCreatedAt.DESC, description="The field to sort by."),
     get_users: GetUsersByClientId = Depends(
         Provide[Container.user_get_user_by_client_id]
     ),
@@ -76,7 +78,7 @@ async def get_users(
 ):
     try:
         return ApiResponse.success_response(
-            data=await get_users.execute(token["userId"], query ,page ,limit)
+            data=await get_users.execute(token["userId"], query ,page ,limit, sort_by)
         )
     except GlobalException as e:
         raise e

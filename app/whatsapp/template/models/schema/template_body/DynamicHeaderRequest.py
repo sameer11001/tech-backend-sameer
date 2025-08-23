@@ -1,4 +1,4 @@
-from typing import Any, List, Optional
+from typing import Any, Dict, List, Optional
 from pydantic import BaseModel, field_validator
 
 from app.whatsapp.template.enums.TemplateEnum import TemplateFormat
@@ -8,7 +8,7 @@ class DynamicHeaderRequest(BaseModel):
     format: TemplateFormat
     text: Optional[str] = None
     media_handle: Optional[str] = None
-    variables: Optional[List[str]] = []
+    variablesMap: Optional[List[Dict[str, str]]] = None
     
     @field_validator('text')
     @classmethod

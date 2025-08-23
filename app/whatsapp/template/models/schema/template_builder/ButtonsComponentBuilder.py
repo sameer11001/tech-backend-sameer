@@ -19,6 +19,8 @@ class ButtonsComponentBuilder(ComponentBuilder):
                 button["url"] = button_data.url
             elif button_data.type == ButtonType.PHONE_NUMBER:
                 button["phone_number"] = button_data.phone_number
+            elif button_data.type == ButtonType.COPY_CODE:  
+                button["example"] = button_data.example
             
             buttons.append(button)
         

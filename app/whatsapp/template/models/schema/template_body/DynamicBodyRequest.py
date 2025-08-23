@@ -1,10 +1,10 @@
-from typing import List, Optional
+from typing import Dict, List, Optional
 from pydantic import BaseModel, Field, field_validator
 
 
 class DynamicBodyRequest(BaseModel):
     text: str = Field(..., min_length=1, max_length=1024)
-    variables: Optional[List[str]] = []
+    variablesMap: Optional[List[Dict[str, str]]] = None
     
     @field_validator('text')
     @classmethod

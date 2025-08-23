@@ -6,12 +6,12 @@ from app.core.broker.RabbitMQBroker import RabbitMQBroker
 from aio_pika.pool import Pool
 from aio_pika.abc import AbstractChannel, AbstractRobustExchange
 
-class ChatbotFlowPublisher:
+class MessageHookReceivedPublisher:
     def __init__(self, connection: RabbitMQBroker):
         self._broker = connection
         self._connection: RobustConnection | None = None
         self._channel_pool: Pool[AbstractChannel] | None = None
-        self._exchange_name = "chatbot_flow_exchange"
+        self._exchange_name = "message_hook_received_exchange"
         self._exchange_type = ExchangeType.DIRECT
         
     async def setup(self):
@@ -24,7 +24,7 @@ class ChatbotFlowPublisher:
                 max_size=8
             )
     
-    async def publish_flow_node_event(self, payload: dict, routing_key: str = "chatbot_flow_event"):
+    async def publish_message_hook_received(self, payload: dict, routing_key: str = "message_hook_received_event"):
         await self.setup()
         msg = Message(
             body=msgspec.msgpack.encode(payload),
@@ -40,13 +40,13 @@ class ChatbotFlowPublisher:
             )
             await exchange.publish(msg, routing_key=routing_key)
     
-    async def flow_node_event(self, message_body: dict[str, Any]):
+    async def publish_message(self, message_body: dict[str, Any]):
         payload = {
             "id": str(uuid6.uuid7()),
-            "task": "my_celery.tasks.handle_flow_node_task",
+            "task": "my_celery.tasks.process_received_message_task",
             "args": [message_body],
             "kwargs": {},
             "retries": 5,
             "eta": None
         }
-        await self.publish_flow_node_event(payload)
+        await self.publish_message_hook_received(payload)

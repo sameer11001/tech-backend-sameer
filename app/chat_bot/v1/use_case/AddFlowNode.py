@@ -1,4 +1,5 @@
 from asyncio.log import logger
+from base64 import b64decode
 from io import BytesIO
 import io
 from typing import Any, Dict, List
@@ -323,10 +324,20 @@ class AddFlowNode:
         business_id: str
     ) -> Dict[str, Any]:
         
-        if not media_content or "bytes" not in media_content:
-            raise ValueError("Media content must contain bytes")
-            
-        media_bytes : io.BytesIO = media_content["bytes"]
+        if "base64_data" in media_content:
+            try:
+                media_bytes = self._decode_base64_media(media_content["base64_data"])
+                
+            except Exception as e:
+                raise ValueError(f"Failed to decode base64 media: {str(e)}")
+                
+        elif "bytes" in media_content:
+            media_bytes = media_content["bytes"]
+            if not isinstance(media_bytes, BytesIO):
+                raise ValueError("Bytes content must be BytesIO object")
+        else:
+            raise ValueError("Media content must contain either 'base64_data' or 'bytes'")
+        
         mime_type = media_content.get("mime_type", "")
         file_name = media_content.get("file_name") or f"{uuid6.uuid7()}"
         
@@ -356,16 +367,33 @@ class AddFlowNode:
         content_type = mime_type.split('/')[0] if mime_type else "unknown"
         
         try:
-            cdn_url = self.s3_bucket_service.upload_fileobj(
+            upload_file.file.seek(0)
+            
+            s3_key = self.s3_bucket_service.upload_fileobj(
                 upload_file.file, file_name=file_name
             )
+            
+            cdn_url = self.s3_bucket_service.get_cdn_url(s3_key)
         except Exception as e:
             raise ValueError(f"Failed to upload media to S3: {str(e)}")
 
         return {
             "cdn_url": cdn_url,
+            "s3_key": s3_key,
             "media_id": media_id,
             "file_name": file_name,
             "content_type": content_type,
             "mime_type": mime_type
         }
+
+    def _decode_base64_media(self, base64_data: str) -> BytesIO:
+
+        try:
+            if base64_data.startswith('data:'):
+                base64_data = base64_data.split(',', 1)[1]
+            
+            decoded_bytes = b64decode(base64_data)
+            return BytesIO(decoded_bytes)
+            
+        except Exception as e:
+            raise ValueError(f"Failed to decode base64 data: {str(e)}")

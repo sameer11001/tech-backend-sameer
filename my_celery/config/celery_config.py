@@ -9,6 +9,7 @@ broadcast_exchange = Exchange("message_broadcast_exchange", type="direct", durab
 trigger_chatbot_exchange = Exchange("trigger_chatbot_exchange", type="fanout", durable=True)
 chatbot_reply_exchange = Exchange("chatbot_replies_exchange", type="direct", durable=True)
 chatbot_flow_exchange = Exchange("chatbot_flow_exchange", type="direct", durable=True)
+message_hook_received_exchange = Exchange("message_hook_received_exchange", type="direct", durable=True)
 system_logs_exchange = Exchange("system_logs_exchange", type="direct", durable=True)
 test_flow_exchange = Exchange("test_flow_exchange", type="direct", durable=True)
 
@@ -20,6 +21,7 @@ QUEUES = [
     Queue("increment_triggered_chatbot_queue", exchange=trigger_chatbot_exchange, durable=True, delivery_mode=2),
     Queue("chatbot_replies_queue", exchange=chatbot_reply_exchange, routing_key="chatbot_replies_event", durable=True, delivery_mode=2),
     Queue("handle_flow_node_queue", chatbot_flow_exchange, routing_key="chatbot_flow_event", durable=True, delivery_mode=2),
+    Queue("message_hook_received_queue", message_hook_received_exchange, routing_key="message_hook_received_event", durable=True, delivery_mode=2),
     Queue("system_logs_queue", system_logs_exchange, routing_key="system_logs_event", durable=True, delivery_mode=2),
     Queue("test_flow_queue", test_flow_exchange, routing_key="test_flow_event", durable=True, delivery_mode=2),
 
@@ -32,6 +34,7 @@ TASK_ROUTES = {
     "my_celery.tasks.conversation_chatbot_is_triggered_task": {"queue": "conversation_chatbot_is_triggered_queue"},
     "my_celery.tasks.increment_triggered_chatbot_task": {"queue": "increment_triggered_chatbot_queue"},
     "my_celery.tasks.handle_flow_node_task": {"queue": "chatbot_flow_queue"},
+    "my_celery.tasks.process_received_message_task": {"queue": "message_hook_received_queue"},
     "my_celery.tasks.system_logs_handler_task": {"queue": "system_logs_queue"},
     "my_celery.tasks.test_flow_task": {"queue": "test_flow_queue"},
 }
@@ -43,6 +46,7 @@ CELERY_TASK = [
     "my_celery.tasks.conversation_chatbot_is_triggered_task",
     "my_celery.tasks.increment_triggered_chatbot_task",
     "my_celery.tasks.handle_flow_node_task",
+    "my_celery.tasks.process_received_message_task",
     "my_celery.tasks.system_logs_handler_task",
     "my_celery.tasks.test_flow_task"
     ]

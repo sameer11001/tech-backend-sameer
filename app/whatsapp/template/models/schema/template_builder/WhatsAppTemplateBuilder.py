@@ -35,7 +35,7 @@ class WhatsAppTemplateBuilder:
         return CreateTemplateRequest(
             name=template_request.name,
             category=template_request.category,
-            language=WhatsAppTemplateBuilder._normalize_language_code(template_request.language),
+            language=template_request.language,
             components=components
         )
     

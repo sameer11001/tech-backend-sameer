@@ -103,7 +103,6 @@ class QuickReplyButton(BaseModel):
         ..., description="One payload parameter"
     )
 
-
 class URLButton(BaseModel):
     type: Literal["button"] = Field("button", Literal=True)
     sub_type: Literal["url"] = Field("url", Literal=True)

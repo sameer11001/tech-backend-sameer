@@ -41,7 +41,11 @@ class GetTemplates:
             "client_id": client.id
         } 
         skip = (page - 1) * limit
-        sort = [("created_at", sort_by.value)]
+        
+        if sort_by == SortByCreatedAt.ASC:
+            sort = [("created_at", 1)]
+        else:
+            sort = [("created_at", -1)]
         
         if search_name:
             query["name"] = {"$regex": f"^{search_name}", "$options": "i"}

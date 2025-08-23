@@ -13,7 +13,7 @@ class PostgresDatabase:
         self._engine = create_async_engine(
             db_url,
             echo=False,
-            pool_size=15,
+            pool_size=10,
             max_overflow=5,
             pool_timeout=30,
             pool_recycle=1800,
