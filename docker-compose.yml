@@ -7,10 +7,14 @@ services:
     ports:
       - "8000:8000"
     depends_on:
-      - postgres
-      - mongo
-      - redis
-      - rabbitmq
+      postgres:
+        condition: service_healthy
+      mongo:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      rabbitmq:
+        condition: service_healthy
     environment:
       - DATABASE_URL=${POSTGRES_DATABASE_URL}
       - MONGO_URI=mongodb://mongo_user:mongo_password@mongo:27017/db_name?authSource=admin
@@ -19,6 +23,7 @@ services:
       - .:/app
     networks:
       - app-network
+    restart: unless-stopped
 
   celery_worker:
     build:
@@ -32,7 +37,6 @@ services:
         --gid=1
         --loglevel=DEBUG
         --autoscale=10,2
-
     volumes:
       - .:/worker
     depends_on:
@@ -54,6 +58,11 @@ services:
       - app-network
     volumes:
       - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER} -d ${POSTGRES_DB}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
 
   mongo:
     image: mongo:8.0.3-noble
@@ -68,6 +77,12 @@ services:
       - app-network
     volumes:
       - mongo_data:/data/db
+    healthcheck:
+      test: ["CMD", "mongosh", "--eval", "db.adminCommand('ping')"]
+      interval: 10s
+      timeout: 10s
+      retries: 5
+      start_period: 30s
 
   redis:
     image: redis:7-alpine
@@ -78,6 +93,7 @@ services:
       - app-network
     volumes:
       - redis_data:/data
+    command: redis-server --notify-keyspace-events KxE
     healthcheck:
       test: ["CMD", "redis-cli", "ping"]
       interval: 5s
@@ -96,6 +112,12 @@ services:
       - "15672:15672"
     networks:
       - app-network
+    healthcheck:
+      test: ["CMD", "rabbitmq-diagnostics", "-q", "ping"]
+      interval: 10s
+      timeout: 10s
+      retries: 5
+      start_period: 30s
 
 networks:
   app-network:
@@ -104,4 +126,3 @@ volumes:
   postgres_data:
   mongo_data:
   redis_data:
-  redis_broker_data:

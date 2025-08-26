@@ -9,6 +9,7 @@ from sqlmodel.ext.asyncio.session import AsyncSession
 class RoleRepository(BaseRepository[Role]):
 
     def __init__(self, session : AsyncSession):
+        self.session = session
         super().__init__(model=Role, session=session)
 
     async def get_by_name(self, role_name: str) -> Optional[Role]:

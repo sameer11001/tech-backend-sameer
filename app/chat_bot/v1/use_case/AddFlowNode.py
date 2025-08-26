@@ -2,12 +2,11 @@ from asyncio.log import logger
 from base64 import b64decode
 from io import BytesIO
 import io
-from typing import Any, Dict, List
+from typing import Any, Dict
 
 from fastapi import UploadFile
 import uuid6
 from app.chat_bot.models.ChatBot import FlowNode, ServiceHook
-from app.chat_bot.models.ChatBotMeta import ChatBotMeta
 from app.chat_bot.models.schema.chat_bot_body.DynamicChatBotRequest import DynamicChatBotRequest
 from app.chat_bot.models.schema.chat_bot_body.DynamicFlowNodBodyRequest import ContentItem, MessageContentNodeRequest, QuestionContentNodeRequest
 from app.chat_bot.models.schema.chat_bot_body.DynamicFlowNodeRequest import DynamicFlowNodeRequest
@@ -20,7 +19,6 @@ from app.core.services.S3Service import S3Service
 from app.utils.enums.FlowNodeType import FlowNodeType
 from app.utils.enums.InteractiveMessageEnum import HeaderType, InteractiveType
 from app.utils.enums.MessageContentType import MessageContentType
-from app.whatsapp.business_profile.v1.models.BusinessProfile import BusinessProfile
 from app.whatsapp.business_profile.v1.services.BusinessProfileService import BusinessProfileService
 from app.whatsapp.media.external_services.WhatsAppMediaApi import WhatsAppMediaApi
 
@@ -55,6 +53,8 @@ class AddFlowNode:
         chat_bot = await self.chatbot_service.get(
             request_body.chatbot_id, 
         )
+        
+        logger.debug("we are here")
 
         for node in request_body.nodes:
             domain_node : FlowNode = await self.dispatch_nodes(node, business_profile_id)

@@ -1,6 +1,7 @@
 from typing import Any, Dict, Optional
 from uuid import UUID
 from app.core.decorators.log_decorator import log_class_methods
+from app.core.logs.logger import get_logger
 from app.core.repository.MongoRepository import MongoCRUD
 from app.core.storage.redis import AsyncRedisService
 from app.utils.Helper import Helper
@@ -10,7 +11,6 @@ from app.whatsapp.team_inbox.models.MessageMeta import MessageMeta
 from app.whatsapp.team_inbox.services.MessageService import MessageService
 
 
-@log_class_methods("SaveMessage")
 class SaveMessage:
     def __init__(
         self,
@@ -21,6 +21,7 @@ class SaveMessage:
         self.message_service = message_service
         self.message_repo = message_repo
         self.redis_service = redis_service
+        self.logger = get_logger("SaveMessageProcess")
 
     async def process_message(
         self,

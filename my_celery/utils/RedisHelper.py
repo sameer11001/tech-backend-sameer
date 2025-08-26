@@ -20,6 +20,10 @@ class RedisHelper:
     def redis_user_info_key(user_id: str) -> str:
         return f"auth:user:info:{{{user_id}}}"
     
+    @staticmethod
+    def redis_business_data_by_conversation_key(conversation_id: str) -> str:
+        return f"business_data:{{{conversation_id}}}"
+    
     ############################################## conversation and team inbox
     @staticmethod
     def redis_team_online_key(team_id: str) -> str:

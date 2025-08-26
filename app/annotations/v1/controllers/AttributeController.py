@@ -1,4 +1,3 @@
-from typing import Optional
 from fastapi import APIRouter, Depends, status
 from fastapi import Query
 
@@ -24,6 +23,7 @@ from app.annotations.v1.use_case.UpdateAttribute import UpdateAttribute
 from app.utils.generate_responses import generate_responses
 
 router = APIRouter()
+
 @router.get("/", response_model=ApiResponse[GetAttributeResponse],
             responses = {**generate_responses([],default_exception=True)},
             status_code=status.HTTP_200_OK)

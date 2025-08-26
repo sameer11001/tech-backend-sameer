@@ -122,7 +122,6 @@ class CallButton(BaseModel):
     )
 
 
-# Flattened union of all component types
 TemplateComponent = Union[
     HeaderComponent,
     BodyComponent,

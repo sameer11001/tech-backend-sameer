@@ -8,11 +8,11 @@ logger = logging.getLogger(__name__)
 def publish_flow_node_event(payload: Dict[str, Any]) -> bool:
 
     try:
-        flow_node_exchange = Exchange("flow_node_exchange", type="direct", durable=True)
+        flow_node_exchange = Exchange("chatbot_flow_exchange", type="direct", durable=True)
         flow_node_queue = Queue(
-            "handle_flow_node_queue", 
+            "chatbot_flow_queue", 
             exchange=flow_node_exchange, 
-            routing_key="handle_flow_node", 
+            routing_key="chatbot_flow_event", 
             durable=True, 
             delivery_mode=2
         )
@@ -23,7 +23,7 @@ def publish_flow_node_event(payload: Dict[str, Any]) -> bool:
                 serializer="msgpack",
                 declare=[flow_node_queue],
                 exchange=flow_node_exchange,
-                routing_key="handle_flow_node",
+                routing_key="chatbot_flow_event",
                 wrap=False,
                 retry=True,
                 retry_policy={

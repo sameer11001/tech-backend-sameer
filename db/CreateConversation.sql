@@ -65,7 +65,9 @@ BEGIN
             status, allow_broadcast, allow_sms,
             client_id
         ) VALUES (
-            v_contact_id, ts_now, ts_now,
+            v_contact_id, 
+            ts_now, 
+            ts_now,
             v_contact_name,
             p_country_code_phone,
             p_contact_phone,
@@ -82,16 +84,6 @@ BEGIN
     WHERE user_id = p_user_id
     LIMIT 1;
 
-    IF NOT FOUND THEN
-        v_assignment_id := uuid_generate_v7();
-        INSERT INTO assignments (
-            id, created_at, updated_at,
-            user_id, assigned_by
-        ) VALUES (
-            v_assignment_id, ts_now, ts_now,
-            p_user_id, p_user_id
-        );
-    END IF;
 
     p_conversation_id := uuid_generate_v7();
     INSERT INTO conversations (

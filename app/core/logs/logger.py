@@ -1,7 +1,5 @@
-import asyncio
 import structlog
 from contextvars import ContextVar
-from typing import Any, Dict, Optional
 
 request_id_ctx: ContextVar[str] = ContextVar('request_id', default='SYSTEM')
 correlation_id_ctx: ContextVar[str] = ContextVar('correlation_id', default='GLOBAL')

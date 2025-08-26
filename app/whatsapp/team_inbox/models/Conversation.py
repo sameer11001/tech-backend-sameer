@@ -10,7 +10,7 @@ from app.whatsapp.team_inbox.utils.conversation_status import ConversationStatus
 class Conversation(BaseEntity, table=True):
     __tablename__ = "conversations"
 
-    status: ConversationStatus = Field(default=ConversationStatus.PENDING,nullable=True)
+    status: ConversationStatus = Field(...,nullable=True)
     
     is_open: bool = Field(nullable=False, default=False)
     

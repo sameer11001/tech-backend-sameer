@@ -12,6 +12,7 @@ from app.annotations.models.ContactAttributeLink import ContactAttributeLink
 
 class AttributeRepository(BaseRepository[Attribute]):
     def __init__(self, session : AsyncSession):
+        self.session = session
         super().__init__(Attribute, session)
 
     async def get_by_name_and_client_id(self, attribute_name: str, client_id: str) -> Optional[Attribute]:

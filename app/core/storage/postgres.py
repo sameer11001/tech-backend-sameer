@@ -1,12 +1,6 @@
-from typing import AsyncGenerator
-from fastapi.concurrency import asynccontextmanager
 from sqlmodel import SQLModel
 from sqlmodel.ext.asyncio.session import AsyncSession
 from sqlalchemy.ext.asyncio import create_async_engine , async_sessionmaker
-from sqlalchemy.orm import sessionmaker
-
-from app.core.exceptions.custom_exceptions.DataBaseException import DataBaseException
-
 
 class PostgresDatabase:
     def __init__(self, db_url: str) -> None:

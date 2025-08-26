@@ -42,37 +42,27 @@ class BaseRepository(Generic[T]):
                 raise DataBaseException(str(e))
 
     async def update(self, id: UUID, data: Dict[str, Any], commit: bool = True) -> T:
+            
         async with self.session as db_session:
             try:
                 obj = await db_session.get(self.model, id)
                 if not obj:
                     raise EntityNotFoundException()
-                
-                if not isinstance(data, dict):
-                    if hasattr(data, "model_dump"):
-                        # Pydantic model
-                        data_dict = data.model_dump(exclude_unset=True, exclude_none=True)
-                    elif hasattr(data, "__dict__"):
-                        # Regular object
-                        data_dict = {k: v for k, v in data.__dict__.items() 
-                                   if not k.startswith('_') and v is not None}
-                    else:
-                        raise ValueError(f"Unsupported data type: {type(data)}")
-                else:
-                    data_dict = data
-
+        
+                data_dict = (
+                    data.model_dump(exclude_unset=True) if hasattr(data, "model_dump") else data
+                )
+        
                 for key, value in data_dict.items():
-                    if hasattr(obj, key) and value is not None:
-                        current_value = getattr(obj, key)
-                        if current_value != value:
-                            setattr(obj, key, value)
-
-                obj = await db_session.merge(obj)
-
+                    if hasattr(obj, key):
+                        setattr(obj, key, value)
+        
                 if commit:
                     await db_session.commit()
                     await db_session.refresh(obj)
+        
                 return obj
+            
             except SQLAlchemyError as e:
                 raise DataBaseException(str(e))
 

@@ -13,12 +13,12 @@ from app.utils.enums.SortBy import SortByCreatedAt
 class UserRepository(BaseRepository[User]):
     def __init__(self, session : AsyncSession):
         
-        self.session_manager = session
+        self.session = session
         
         super().__init__(model=User, session=session)
 
     async def get_by_email(self, email: str) -> Optional[User]:
-        async with self.session_manager as db_session:
+        async with self.session as db_session:
             try:
                 statement = select(self.model).where(self.model.email == email)
                 result = await db_session.exec(statement)
@@ -29,7 +29,7 @@ class UserRepository(BaseRepository[User]):
     async def get_users_by_client_id(
         self, client_id: str, query: str, page: int, limit: int, sort_by: Optional[SortByCreatedAt]
     ) -> Dict[str, Union[List[User], int]]:
-        async with self.session_manager as db_session:
+        async with self.session as db_session:
             try:
                 base_query = select(self.model).where(self.model.client_id == client_id)
                 
@@ -72,7 +72,7 @@ class UserRepository(BaseRepository[User]):
                 raise DataBaseException(str(e))
 
     async def get_users_by_client_id_count(self, client_id: str) -> int:
-        async with self.session_manager as db_session:
+        async with self.session as db_session:
             try:
                 query = select(func.count(self.model.id)).where(self.model.client_id == client_id)
                 result = await db_session.exec(query)
@@ -83,7 +83,7 @@ class UserRepository(BaseRepository[User]):
     async def search_user(
         self, query_str: str, client_id: str, page: int, limit: int
     ) -> Dict[str, Union[List[User], int]]:
-        async with self.session_manager as db_session:
+        async with self.session as db_session:
             try:
                 count_query = select(func.count(self.model.id)).where(
                     self.model.client_id == client_id,
@@ -117,7 +117,7 @@ class UserRepository(BaseRepository[User]):
                 raise DataBaseException(str(e))
 
     async def get_by_id_and_team_id(self, user_id: str, team_id: str) -> Optional[User]:
-        async with self.session_manager as db_session:
+        async with self.session as db_session:
             try:
                 result = await db_session.exec(
                     select(self.model).where(self.model.id == user_id, self.model.team_id == team_id)

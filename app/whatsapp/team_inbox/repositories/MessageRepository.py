@@ -7,6 +7,7 @@ from sqlalchemy.exc import SQLAlchemyError
 
 class MessageRepository(BaseRepository[MessageMeta]):
     def __init__(self, session: AsyncSession) -> None:
+        self.session = session
         super().__init__(MessageMeta, session)
 
     async def get_last_message(self, conversation_id: str) -> MessageMeta:

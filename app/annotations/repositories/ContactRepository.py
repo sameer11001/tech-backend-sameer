@@ -14,6 +14,8 @@ from app.whatsapp.business_profile.v1.models.BusinessProfile import BusinessProf
 
 class ContactRepository(BaseRepository[Contact]):
     def __init__(self, session):
+        self.session = session
+        
         super().__init__(Contact, session)
 
     async def get_by_client_id(

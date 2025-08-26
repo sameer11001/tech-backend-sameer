@@ -181,10 +181,6 @@ class Container(containers.DeclarativeContainer):
         client=http_client,
         log_service=system_log_service  
     )
-    http_service = providers.Singleton(
-        HTTPService,
-        enhanced_client=http_client
-    )
     #----- API -----
     business_profile_api = providers.Singleton(BusinessProfileApi, client = http_client)
     whatsapp_template_api = providers.Singleton(WhatsAppTemplateApi, client = http_client)

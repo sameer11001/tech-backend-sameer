@@ -1,4 +1,5 @@
 
+import json
 from app.utils.RedisHelper import RedisHelper
 from app.whatsapp.team_inbox.models.Conversation import Conversation
 from app.whatsapp.template.models.Template import Template
@@ -68,13 +69,15 @@ class TemplateMessage:
 
         template_body = template_body.model_dump(exclude_none=True)
         
-        template_object = TemplateBuilder.build_template_object(template_body, parameters).model_dump(exclude_none=True)
+        template_object = TemplateBuilder.build_template_object(template_body, parameters)
+        
+        template_dict = template_object.model_dump(exclude_none=True)  
 
         request_model = SendTemplateRequest(
             messaging_product="whatsapp",
             to=recipient_number,
             type="template",
-            template=template_object,
+            template=template_dict,
         )
         
         response_body = await self.whatsapp_message_api.send_template_message(

@@ -5,6 +5,7 @@ from sqlmodel.ext.asyncio.session import AsyncSession
 
 class AssignmentRepository(BaseRepository[Assignment]):
     def __init__(self, session: AsyncSession):
+        self.session = session
         super().__init__(model=Assignment, session=session)
         
     

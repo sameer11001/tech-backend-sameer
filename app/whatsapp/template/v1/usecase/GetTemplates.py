@@ -1,22 +1,12 @@
 import math
 from typing import Any, Dict, Optional
-from uuid import UUID
-
-from fastapi import logger
 
 from app.core.repository.MongoRepository import MongoCRUD
-from app.core.schemas.BaseResponse import ApiResponse
 from app.core.schemas.PageableResponse import PageableResponse
 from app.user_management.user.models.User import User
 from app.user_management.user.services.UserService import UserService
 from app.utils.enums.SortBy import SortByCreatedAt
-from app.whatsapp.business_profile.external_services.BusinessProfileApi import (
-    BusinessProfileApi,
-)
-from app.whatsapp.business_profile.v1.models.BusinessProfile import BusinessProfile
-from app.whatsapp.business_profile.v1.services.BusinessProfileService import (
-    BusinessProfileService,
-)
+
 from app.user_management.user.models.Client import Client
 
 from app.whatsapp.template.models.Template import Template

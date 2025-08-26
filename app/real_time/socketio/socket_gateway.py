@@ -1,8 +1,7 @@
-import json
 import asyncio
 from datetime import datetime
 import os
-from typing import Dict, Optional, Set, Any
+from typing import Dict, Optional, Set
 from socketio import AsyncServer
 
 from app.core.logs.logger import get_logger
@@ -26,10 +25,7 @@ class SocketMessageGateway:
         self.redis = redis
         self.business_profile_service = business_profile_service
         self.logger = get_logger("SocketMessageGateway")
-        
         self.worker_id = os.getpid() if hasattr(os, 'getpid') else 'unknown'
-        
-        self.connection_lock = asyncio.Lock()
         
         self._register_handlers()
 
@@ -198,9 +194,6 @@ class SocketMessageGateway:
         logger = self._get_logger(sid, component='socket_connect')
         
         try:
-            async with self.connection_lock:
-                await logger.ainfo("Socket connection attempt", auth_provided=bool(auth))
-            
             token = auth.get("token", None)
             if not token:
                 await logger.awarning("No JWT provided - disconnecting")

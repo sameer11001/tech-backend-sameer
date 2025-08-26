@@ -1,25 +1,10 @@
-from typing import Any, Dict, List
-
-import uuid6
-from app.chat_bot.models.ChatBot import FlowNode, ServiceHook
 from app.chat_bot.models.ChatBotMeta import ChatBotMeta
-from app.chat_bot.models.schema.chat_bot_body.DynamicChatBotRequest import DynamicChatBotRequest
-from app.chat_bot.models.schema.chat_bot_body.DynamicFlowNodBodyRequest import ContentItem, MessageContentNodeRequest, QuestionContentNodeRequest
-from app.chat_bot.models.schema.chat_bot_body.DynamicFlowNodeRequest import DynamicFlowNodeRequest
-from app.chat_bot.models.schema.interactive_body.DynamicInteractiveMessageRequest import DynamicInteractiveMessageRequest
 from app.chat_bot.models.schema.request.CreateChatBotRequest import CreateChatBotRequest
 from app.chat_bot.models.schema.response.CreateChatBotResponse import CreateChatBotResponse
 from app.chat_bot.services.ChatBotService import ChatBotService
-
-from app.core.repository.MongoRepository import MongoCRUD
 from app.core.schemas.BaseResponse import ApiResponse
-from app.core.services.S3Service import S3Service
-from app.utils.enums.FlowNodeType import FlowNodeType
-from app.utils.enums.InteractiveMessageEnum import HeaderType, InteractiveType
-from app.utils.enums.MessageContentType import MessageContentType
 from app.whatsapp.business_profile.v1.models.BusinessProfile import BusinessProfile
 from app.whatsapp.business_profile.v1.services.BusinessProfileService import BusinessProfileService
-from app.whatsapp.media.external_services.WhatsAppMediaApi import WhatsAppMediaApi
 
 
 class CreateChatBot:

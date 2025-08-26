@@ -8,6 +8,7 @@ from sqlalchemy.exc import SQLAlchemyError
 
 class ChatBotRepository(BaseRepository[ChatBotMeta]):
     def __init__(self, session: AsyncSession):
+        self.session = session
         super().__init__(ChatBotMeta, session)
 
     async def get_chatbot_by_client_id(self, client_id: str,page: int, limit: int, search: Optional[str] = None) -> dict:

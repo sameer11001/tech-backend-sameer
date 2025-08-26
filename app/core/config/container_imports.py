@@ -39,7 +39,6 @@ from app.core.logs.LogCRUD import LogCRUD
 from app.core.logs.LoggingBaseMiddleWare import LoggingMiddleware
 from app.core.logs.SystemLogService import SystemLogService
 from app.core.services.HTTPClient import EnhancedHTTPClient
-from app.core.services.HTTPService import HTTPService
 from app.events.pub.ChatBotTriggerPublisher import ChatBotTriggerPublisher
 from app.events.pub.ChatbotFlowPublisher import ChatbotFlowPublisher
 from app.events.pub.MessageBroadcastPublisher import MessageBroadcastPublisher

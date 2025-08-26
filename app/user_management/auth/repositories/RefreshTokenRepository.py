@@ -9,6 +9,7 @@ from app.user_management.auth.models.RefreshToken import RefreshToken
 class RefreshTokenRepository(BaseRepository[RefreshToken]):
 
     def __init__(self, session : AsyncSession):
+        self.session = session
         super().__init__(model=RefreshToken, session=session)
 
     async def get_by_token(self, token: str) -> Optional[RefreshToken]:

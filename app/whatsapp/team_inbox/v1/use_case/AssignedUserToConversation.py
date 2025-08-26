@@ -1,5 +1,7 @@
 import json
+from uuid import UUID
 
+from app.core.logs.logger import get_logger
 from app.core.repository.MongoRepository import MongoCRUD
 from app.core.schemas.BaseResponse import ApiResponse
 from app.real_time.socketio.socket_gateway import SocketMessageGateway
@@ -16,7 +18,8 @@ from app.whatsapp.team_inbox.services.MessageService import MessageService
 
 class AssignedUserToConversation:
     def __init__(
-        self, conversation_service: ConversationService, 
+        self, 
+        conversation_service: ConversationService, 
         user_service: UserService, 
         message_crud: MongoCRUD[Message],
         message_service:MessageService,
@@ -29,7 +32,7 @@ class AssignedUserToConversation:
         self.message_service = message_service
         self.assignment_service = assignment_service
         self.socket_gateway = socket_gateway
-        
+        self.logger = get_logger("MessageHook")
         
     async def execute(self, assigned_by: str, assigned_to: str,conversation_id: str):
         
@@ -45,16 +48,18 @@ class AssignedUserToConversation:
         
         if conversation.assignment_id:            
             assignment : Assignment = await self.assignment_service.get(conversation.assignment_id)
+            
+            await self.assignment_service.update(assignment.id, {"user_id": assigned_to, "assigned_by": assigned_by})
+
         else:                                     
             assignment = Assignment(
-                user_id=None,
+                user_id=assigned_to,
                 assigned_by=assigned_by
             )
             assignment = await self.assignment_service.create(assignment)
             conversation.assignment_id = assignment.id
+            await self.conversation_service.update(conversation.id, {"assignment_id": assignment.id})
 
-        await self.assignment_service.update(assignment.id, {"user_id": assigned_to, "assigned_by": user.id})
-        
         message_meta_data = MessageMeta(
             message_type="assign",
             whatsapp_message_id=" ",

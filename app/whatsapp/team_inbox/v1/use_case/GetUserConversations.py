@@ -10,13 +10,20 @@ from app.user_management.user.services.UserService import UserService
 from app.utils.Helper import Helper
 from app.utils.RedisHelper import RedisHelper
 from app.whatsapp.team_inbox.models.Conversation import Conversation
+from app.whatsapp.team_inbox.models.MessageMeta import MessageMeta
 from app.whatsapp.team_inbox.models.schema.response.ConversationWithContact import ConversationWithContact
 from app.whatsapp.team_inbox.services.ConversationService import ConversationService
 from app.whatsapp.team_inbox.services.MessageService import MessageService
 
 logger = get_logger(__name__)
 class GetUserConversations:
-    def __init__(self, conversation_service: ConversationService, user_service: UserService,contact_service:ContactService,message_service:MessageService,redis: AsyncRedisService):
+    def __init__(self, 
+                conversation_service: ConversationService, 
+                user_service: UserService,
+                contact_service:ContactService,
+                message_service:MessageService,
+                redis: AsyncRedisService
+        ):
         self.conversation_service = conversation_service
         self.user_service = user_service
         self.contact_service = contact_service
@@ -37,7 +44,14 @@ class GetUserConversations:
             
             redis_key = RedisHelper.redis_conversation_last_message_key(conversation.id)
             
-            conversation_redis_data = await self.redis.get(redis_key)
+            lastmessage_redis_data = None
+            if await self.redis.exists(redis_key):
+                lastmessage_redis_data = await self.redis.get(redis_key)
+            else:
+                message : MessageMeta = await self.message_service.get_last_message(conversation.id)
+                redis_data =RedisHelper.redis_conversation_last_message_data(last_message= message.message_type, last_message_time= message.created_at.isoformat())
+                await self.redis.set(redis_key, redis_data)
+                lastmessage_redis_data = redis_data
             
             conversation_expiration_time_value : Optional[str] = None
             
@@ -65,8 +79,8 @@ class GetUserConversations:
                 contact_name=contact.name,
                 contact_phone_number=contact.phone_number,
                 country_code_phone_number=contact.country_code,
-                last_message=conversation_redis_data['last_message'] if conversation_redis_data else None,
-                last_message_time=conversation_redis_data['last_message_time'] if conversation_redis_data else None,
+                last_message=lastmessage_redis_data['last_message'] if lastmessage_redis_data else None,
+                last_message_time=str(lastmessage_redis_data['last_message_time']) if lastmessage_redis_data else None,
                 conversation_is_expired= is_conversation_expired,
                 conversation_expiration_time=conversation_expiration_time_value,
                 unread_count=unread_count

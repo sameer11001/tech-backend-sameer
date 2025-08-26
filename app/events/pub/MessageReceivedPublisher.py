@@ -24,7 +24,7 @@ class MessageHookReceivedPublisher:
                 max_size=8
             )
     
-    async def publish_message_hook_received(self, payload: dict, routing_key: str = "message_hook_received_event"):
+    async def _publish_message_hook_received(self, payload: dict, routing_key: str = "message_hook_received_event"):
         await self.setup()
         msg = Message(
             body=msgspec.msgpack.encode(payload),
@@ -40,13 +40,13 @@ class MessageHookReceivedPublisher:
             )
             await exchange.publish(msg, routing_key=routing_key)
     
-    async def publish_message(self, message_body: dict[str, Any]):
+    async def publish_message(self, message_body: dict[str, Any],conversation_id: str = None):
         payload = {
             "id": str(uuid6.uuid7()),
             "task": "my_celery.tasks.process_received_message_task",
-            "args": [message_body],
+            "args": [message_body,conversation_id],
             "kwargs": {},
             "retries": 5,
             "eta": None
         }
-        await self.publish_message_hook_received(payload)
+        await self._publish_message_hook_received(payload)

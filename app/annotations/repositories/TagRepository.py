@@ -11,6 +11,7 @@ from app.annotations.models.ContactTagLink import ContactTagLink
 class TagRepository(BaseRepository[Tag]):
 
     def __init__(self, session : AsyncSession):
+        self.session = session
         super().__init__(Tag, session)
 
     async def get_by_name_and_client_id(self, tag_name: str, client_id: str) -> Tag:

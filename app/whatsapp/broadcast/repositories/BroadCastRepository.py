@@ -10,10 +10,13 @@ from sqlmodel.ext.asyncio.session import AsyncSession
 
 class BroadcastRepository(BaseRepository[BroadCast]):
     def __init__(self, session: AsyncSession):
+        
+        self.session  = session
+        
         super().__init__(BroadCast, session)
 
     async def get_by_business_profile_id(self, business_profile_id: str, page: int, limit: int,search: str, sort_by: SortByCreatedAt) -> List[BroadCast]:
-        async with self.session as db_session:
+        async with self.session  as db_session:
             try:
                 query = (
                     select(BroadCast).where(

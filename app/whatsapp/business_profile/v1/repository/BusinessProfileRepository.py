@@ -9,6 +9,7 @@ from sqlmodel.ext.asyncio.session import AsyncSession
 class BusinessProfileRepository(BaseRepository[BusinessProfile]):
 
     def __init__(self, session : AsyncSession):
+        self.session = session
         super().__init__(model=BusinessProfile, session=session)
 
     async def get_by_client_id(self, client_id: str) -> Optional[BusinessProfile]:

@@ -12,6 +12,7 @@ from app.annotations.models.ContactNoteLink import ContactNoteLink
 
 class NoteRepository(BaseRepository[Note]):
     def __init__(self, session : AsyncSession):
+        self.session = session
         super().__init__(Note, session)
 
     async def get_by_contact_id(self, contact_id: str, page: int, limit: int) -> Dict[str, Any]:

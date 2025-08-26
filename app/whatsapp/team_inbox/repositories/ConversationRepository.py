@@ -17,6 +17,7 @@ from app.whatsapp.team_inbox.models.MessageMeta import MessageMeta
 
 class ConversationRepository(BaseRepository[Conversation]):
     def __init__(self, session: AsyncSession):
+        self.session = session
         super().__init__(Conversation, session)
 
     async def find_by_contact_and_client_number(

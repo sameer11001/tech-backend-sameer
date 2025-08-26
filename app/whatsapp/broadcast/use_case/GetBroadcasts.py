@@ -15,7 +15,7 @@ class GetBroadcasts:
         self.business_profile_service = business_profile_service
     
     
-    async def execute(self, business_profile_id: UUID, page: int = 1, limit: int = 10, search_name: Optional[str] = None,sort_by: Optional[SortByCreatedAt]=None) -> Optional[BroadCast]:
+    async def execute(self, business_profile_id: UUID, page: int = 1, limit: int = 10, search_name: Optional[str] = None,sort_by: Optional[SortByCreatedAt]=None):
         
         business_profile = await self.business_profile_service.get(business_profile_id)
         
@@ -24,9 +24,9 @@ class GetBroadcasts:
             
             return ApiResponse(
                 data=GetBroadcastResponse(
-                    broadcasts=brodcasts_list,
-                    total_count=brodcasts_list['total_count'],
-                    total_pages=(brodcasts_list['total_count'] + limit - 1) // limit,
+                    broadcasts=brodcasts_list["broadcasts"],
+                    total_count=brodcasts_list["total_count"],
+                    total_pages=(brodcasts_list["total_count"] + limit - 1) // limit,
                     limit=limit,
                     page=page
                 ),
@@ -34,4 +34,4 @@ class GetBroadcasts:
             )
         
         except Exception as e:
-            return None 
+            raise e

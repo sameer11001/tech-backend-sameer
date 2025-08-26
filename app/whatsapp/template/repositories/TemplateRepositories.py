@@ -8,6 +8,7 @@ from sqlmodel.ext.asyncio.session import AsyncSession
 
 class TemplateRepository(BaseRepository[TemplateMeta]):
     def __init__(self, session: AsyncSession) -> None:
+        self.session = session
         super().__init__(model=TemplateMeta, session=session)
 
     async def get_template_by_id(self, id: str) -> TemplateMeta:
