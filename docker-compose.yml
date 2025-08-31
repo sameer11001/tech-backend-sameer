@@ -1,0 +1,77 @@
+services:
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: fastapi_app
+    ports:
+      - "8000:8000"
+    depends_on:
+      - redis
+      - rabbitmq
+    environment:
+      - DATABASE_URL=${POSTGRES_DATABASE_URL}
+      - MONGO_URI=mongodb://devUser:nB5%3AtN2sQ7a%2A@142.132.197.241:27017/prog_dev
+      - REDIS_URL=${CACHE_URL}
+    volumes:
+      - .:/app
+    networks:
+      - app-network
+
+  celery_worker:
+    build:
+      context: .
+      dockerfile: celery.Dockerfile
+    container_name: celery_worker
+    working_dir: /worker
+    command: >
+      celery -A my_celery.celery_app worker
+        --uid=1
+        --gid=1
+        --loglevel=DEBUG
+        --autoscale=10,2
+
+    volumes:
+      - .:/worker
+    depends_on:
+      - rabbitmq
+      - redis
+    networks:
+      - app-network
+
+  redis:
+    image: redis:7-alpine
+    container_name: redis-cache
+    ports:
+      - "6379:6379"
+    networks:
+      - app-network
+    volumes:
+      - redis_data:/data
+
+    command: redis-server --notify-keyspace-events KxE
+
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 30s
+      retries: 3
+
+  rabbitmq:
+    image: rabbitmq:4.1.0-management-alpine
+    container_name: rabbitmq
+    environment:
+      RABBITMQ_DEFAULT_USER: ${RABBITMQ_DEFAULT_USER}
+      RABBITMQ_DEFAULT_PASS: ${RABBITMQ_DEFAULT_PASS}
+      RABBITMQ_DEFAULT_VHOST: ${RABBITMQ_VHOST}
+    ports:
+      - "5672:5672"
+      - "15672:15672"
+    networks:
+      - app-network
+
+networks:
+  app-network:
+
+volumes:
+  redis_data:

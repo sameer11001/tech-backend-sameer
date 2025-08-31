@@ -1,0 +1,11 @@
+class MessageType:
+    TEXT = "text"
+    IMAGE = "image"
+    VIDEO = "video"
+    AUDIO = "audio"
+    DOCUMENT = "document"
+    LOCATION = "location"
+    CONTACT = "contact"
+    STICKER = "sticker"
+    POLL = "reaction"
+    REACTION = "template"

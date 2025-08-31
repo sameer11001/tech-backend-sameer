@@ -1,0 +1,7 @@
+alembic/versions
+.venv
+*.log
+*.pyc
+*~
+*.swp
+migrations/versions/*
