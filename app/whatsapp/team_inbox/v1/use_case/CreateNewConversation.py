@@ -64,14 +64,14 @@ class CreateNewConversation:
         
         user: User = await self.user_service.get(user_id)
         full_number = f"{request_body.contact_country_code}{request_body.contact_phone_number}"
-        conversation = await self.conversation_service.find_by_contact_and_client_id(
+        conversation : Conversation = await self.conversation_service.find_by_contact_and_client_id(
             contact_phone_number=request_body.contact_phone_number,
             client_id= str(user.client_id)
         )        
         if conversation:
             raise AlreadyExistException(message="Conversation already exist")
         
-        template_body = await self.mongo_template.get_by_id(request_body.template_id)
+        template_body : Template = await self.mongo_template.get_by_id(request_body.template_id)
         if not template_body:
             raise EntityNotFoundException("Template not found")
         

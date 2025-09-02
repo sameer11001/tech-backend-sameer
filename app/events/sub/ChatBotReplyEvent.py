@@ -20,14 +20,30 @@ logger = get_logger(__name__)
 async def handle_chatbot_reply_event(payload: dict, socketio : SocketMessageGateway = Depends(Provide[Container.socket_message_gateway])):
     message_body = None
     try:
-        logger.info(f"Received chatbot reply payload: {payload}")
+        logger.info("Received chatbot reply payload", payload_type=type(payload).__name__)
 
-        if isinstance(payload, bytes):
-            message_body = msgspec.msgpack.decode(payload)
+        if isinstance(payload, dict) and 'payload' in payload:
+            raw_payload = payload['payload']
+            logger.debug("Extracting nested payload", payload_key_present=True)
         else:
-            message_body = payload
-        
-        logger.info(f"Decoded message body: {message_body}")
+            raw_payload = payload
+            logger.debug("Using direct payload", payload_key_present=False)
+
+        if isinstance(raw_payload, bytes):
+            message_body = msgspec.msgpack.decode(raw_payload)
+            logger.info("Successfully decoded msgpack payload", 
+                       conversation_id=message_body.get("conversation_id"),
+                       message_type=message_body.get("message_type"))
+        elif isinstance(raw_payload, dict):
+            # Already decoded - use as is
+            message_body = raw_payload
+            logger.info("Payload already decoded", 
+                       conversation_id=message_body.get("conversation_id"),
+                       message_type=message_body.get("message_type"))
+        else:
+            logger.error("Unsupported payload format", 
+                        payload_type=type(raw_payload).__name__)
+            return {"status": "error", "message": "Unsupported payload format"}
         
         conversation_id = message_body.get("conversation_id")
         chatbot_id = message_body.get("chatbot_id")
@@ -35,8 +51,14 @@ async def handle_chatbot_reply_event(payload: dict, socketio : SocketMessageGate
         event_type = message_body.get("event_type", "chatbot_reply")
         
         if not conversation_id:
-            logger.error("Missing conversation_id in chatbot reply payload")
-            return
+            logger.error("Missing conversation_id in chatbot reply payload",
+                        available_keys=list(message_body.keys()) if message_body else [])
+            return {"status": "error", "message": "Missing conversation_id"}
+        
+        logger.debug("Building socket message",
+                    conversation_id=conversation_id,
+                    chatbot_id=chatbot_id,
+                    event_type=event_type)
             
         socket_message = {
             "type": "chatbot_message",

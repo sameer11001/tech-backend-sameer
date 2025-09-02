@@ -13,10 +13,8 @@ from app.utils.RedisHelper import RedisHelper
 from app.whatsapp.business_profile.v1.models.BusinessProfile import BusinessProfile
 from app.whatsapp.business_profile.v1.services.BusinessProfileService import BusinessProfileService
 from app.whatsapp.team_inbox.external_services.WhatsAppMessageApi import WhatsAppMessageApi
-from app.whatsapp.team_inbox.models.Assignment import Assignment
 from app.whatsapp.team_inbox.models.Conversation import Conversation
 from app.whatsapp.team_inbox.models.MessageMeta import MessageMeta
-from app.whatsapp.team_inbox.services.AssignmentService import AssignmentService
 from app.whatsapp.team_inbox.services.ConversationService import ConversationService
 from app.whatsapp.team_inbox.services.MessageService import MessageService
 from app.whatsapp.team_inbox.models.Message import Message
@@ -104,8 +102,12 @@ class TextMessage:
             )            
             
             await self.mongo_crud.create(message_document)
+            
             redis_last_message = RedisHelper.redis_conversation_last_message_data(last_message = message_content["text_body"] , last_message_time=f"{message_created_data.created_at}")
             await self.redis_service.set(key=RedisHelper.redis_conversation_last_message_key(str(conversation.id)),value= redis_last_message,ttl=None)
+            
+            redis_chatbot_context = RedisHelper.redis_chatbot_context_key(conversation_id=str(conversation.id))
+            await self.redis_service.delete(redis_chatbot_context)
             
             message_response = { 
                 "data": {
@@ -137,5 +139,7 @@ class TextMessage:
         )  
         if not conversation:
             raise EntityNotFoundException("Conversation not found") 
+        await self.conversation_service.update(conversation.id, {"chatbot_triggered": False})
+        
         return conversation 
     

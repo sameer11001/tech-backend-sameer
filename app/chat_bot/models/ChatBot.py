@@ -17,6 +17,7 @@ class ServiceHook(BaseModel):
 class FlowNodeButtons(BaseModel):
     type: str
     title: str
+    id : str
     next_node_id: Optional[str] = None
 
 class FlowNode(Document, BaseModelNoNone):

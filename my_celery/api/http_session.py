@@ -20,7 +20,7 @@ class RequestsSessionHandler:
             headers["Content-Type"] = content_type
         return headers
 
-    def post(self, url: str, headers: dict, json_data: dict):
-        return self.session.post(url, headers=headers, json=json_data)
+    def post(self, url: str, headers: dict, json: dict):
+        return self.session.post(url, headers=headers, json=json)
     
 http_session = RequestsSessionHandler()

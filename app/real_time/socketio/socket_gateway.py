@@ -507,10 +507,11 @@ class SocketMessageGateway:
                 "conversation_id": str(conversation_id), 
                 "last_message_content": last_message_content, 
                 "last_message_time": f"{message.get('timestamp')}", 
+                "is_chat_bot": False,
                 "unread_count": unread_data['unread_count']
             }
             
-            await self.sio.emit(event="message_received", data=business_data, room=phone_number_id)
+            await self.sio.emit(event="business_message_received", data=business_data, room=phone_number_id)
             
             if conversation_id:
                 message_data = {
@@ -535,30 +536,75 @@ class SocketMessageGateway:
             await logger.aexception("Error emitting received message", error=str(e))
 
     async def emit_chatbot_reply_message(self, payload: dict):
-        logger = self._get_logger("system", component="chatbot_reply", 
-                                conversation_id=payload.get("conversation_id"))
-        
-        try:
-            business_data = payload.get("business_data", {})
-            business_phone_number_id = business_data.get("business_phone_number_id")
-            
-            if not business_phone_number_id:
-                await logger.awarning("Cannot emit chatbot reply - no business phone number ID")
-                return
-                
-            await logger.adebug("Processing chatbot reply message")
-            
-            await self.emit_received_message(
-                message=payload.get("message"), 
-                phone_number_id=business_phone_number_id, 
+        try:        
+            logger = self._get_logger(
+                "system",
+                component="chatbot_reply",
                 conversation_id=payload.get("conversation_id")
             )
-            
-            await logger.ainfo("Chatbot reply message emitted successfully")
         
+            try:
+                conversation_id = payload.get("conversation_id")
+                message_body = payload.get("message", {})
+                business_data = payload.get("business_data", {})
+    
+                if not conversation_id:
+                    await logger.awarning("Cannot emit chatbot reply - no conversation ID")
+                    return
+        
+                await logger.adebug("Processing chatbot reply message")
+        
+                message_data = {
+                    "message": {
+                        "_id": message_body.get("id"),
+                        "wa_message_id": message_body.get("wa_message_id"),
+                        "created_at": message_body.get("created_at"),
+                        "message_type": message_body.get("message_type"),
+                        "content": message_body.get("content"),
+                        "context": message_body.get("context"),
+                        "is_from_contact": False,   
+                        "message_status": message_body.get("message_status"),
+                        "conversation_id": str(conversation_id),
+                        "redis_stream_id": message_body.get("redis_stream_id")
+                    },
+                    "conversation_id": str(conversation_id)
+                }
+                last_message_content = Helper._get_last_message_content(message_data=message_data)
+                
+                redis_last_message = RedisHelper.redis_conversation_last_message_data(last_message=last_message_content,last_message_time=f"{message_body.get("created_at")}")
+                await self.redis.set(key=RedisHelper.redis_conversation_last_message_key(str(conversation_id)),value= redis_last_message)
+                
+                last_message_content = message_body.get("content")
+                last_message_time = message_body.get("created_at")
+    
+                business_message_data = {
+                    "conversation_id": str(conversation_id),
+                    "last_message_content": last_message_content,
+                    "last_message_time": f"{last_message_time}",
+                    "is_chat_bot": True,
+                    "unread_count": ""
+                }
+    
+                business_phone_number_id = business_data.get("business_phone_number_id")
+                if business_phone_number_id:
+                    await self.sio.emit(
+                        event="business_message_received",
+                        data=business_message_data,
+                        room=str(business_phone_number_id)
+                    )
+                    
+                await self.sio.emit(
+                    event="conversation_message_received",
+                    data=message_data,
+                    room=str(conversation_id)
+                )
+                
+                await logger.ainfo("Chatbot reply message emitted successfully")
+        
+            except Exception as e:
+                await logger.aexception("Error emitting chatbot reply message", error=str(e))
         except Exception as e:
             await logger.aexception("Error emitting chatbot reply message", error=str(e))
-
     async def emit_message_status(self, conversation_id: str, status: str, message_id: str):
         logger = self._get_logger("system", component="message_status",
                                 conversation_id=conversation_id,

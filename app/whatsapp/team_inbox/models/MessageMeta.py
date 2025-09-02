@@ -15,6 +15,7 @@ class MessageMeta(BaseEntity, table=True):
     whatsapp_message_id: str = Field(nullable=True)
     is_from_contact: bool = Field(nullable=False,default=False)
     member_id: UUID = Field(foreign_key="users.id", nullable=True, index=True)
+    chat_bot_id: UUID = Field(foreign_key="chat_bots.id", nullable=True,ondelete="SET NULL")
     contact_id: UUID = Field(foreign_key="contacts.id", nullable=True)
     
     conversation_id: UUID = Field(foreign_key="conversations.id", index=True)

@@ -12,7 +12,6 @@ from structlog.processors import (
 from structlog import make_filtering_bound_logger, PrintLoggerFactory
 from contextvars import ContextVar
 
-
 request_id_ctx: ContextVar[str] = ContextVar('request_id', default='SYSTEM')
 correlation_id_ctx: ContextVar[str] = ContextVar('correlation_id', default='GLOBAL')
 socket_session_ctx: ContextVar[str] = ContextVar('socket_session', default='')
@@ -38,7 +37,13 @@ def filter_sensitive_data(_, __, event_dict):
     
     return event_dict
 
+_structlog_configured = False
+
 def configure_structlog(*, debug: bool = False, service_name: str = "whatsapp-service") -> None:
+    global _structlog_configured
+    
+    if _structlog_configured:
+        return
     
     min_level = logging.DEBUG if debug else logging.INFO
 
@@ -90,6 +95,7 @@ def configure_structlog(*, debug: bool = False, service_name: str = "whatsapp-se
         logger_factory = PrintLoggerFactory()
         stream = sys.stdout
         formatter = logging.Formatter("%(message)s")
+        
         logging.getLogger("pymongo").setLevel(logging.WARNING)
         logging.getLogger("pymongo.topology").setLevel(logging.WARNING)
         logging.getLogger("pymongo.serverSelection").setLevel(logging.WARNING)
@@ -99,6 +105,7 @@ def configure_structlog(*, debug: bool = False, service_name: str = "whatsapp-se
         logging.getLogger('aiormq').setLevel(logging.WARNING)
         logging.getLogger('pamqp').setLevel(logging.WARNING)
         logging.getLogger('amqp').setLevel(logging.WARNING)
+        
     else:
         def custom_json_renderer(_, __, event_dict):
             if 'event' in event_dict:
@@ -118,18 +125,7 @@ def configure_structlog(*, debug: bool = False, service_name: str = "whatsapp-se
         logger_factory = PrintLoggerFactory()  
         stream = sys.stdout
         formatter = logging.Formatter("%(message)s")
-
-    structlog.configure(
-        processors=processors,
-        wrapper_class=make_filtering_bound_logger(min_level),
-        logger_factory=logger_factory,
-        cache_logger_on_first_use=True,
-    )
-
-    handler = logging.StreamHandler(stream)
-    handler.setFormatter(formatter)
-    
-    if not debug:
+        
         logging.getLogger("httpx").setLevel(logging.WARNING)
         logging.getLogger("httpcore").setLevel(logging.WARNING)
         logging.getLogger("socketio").setLevel(logging.ERROR)
@@ -145,8 +141,19 @@ def configure_structlog(*, debug: bool = False, service_name: str = "whatsapp-se
         logging.getLogger('pamqp').setLevel(logging.WARNING)
         logging.getLogger('amqp').setLevel(logging.WARNING)
 
-    logging.basicConfig(
-        level=min_level,
-        handlers=[handler],
-        force=True,
+    structlog.configure(
+        processors=processors,
+        wrapper_class=make_filtering_bound_logger(min_level),
+        logger_factory=logger_factory,
+        cache_logger_on_first_use=True,
     )
+
+    root_logger = logging.getLogger()
+    root_logger.handlers.clear()
+    
+    handler = logging.StreamHandler(stream)
+    handler.setFormatter(formatter)
+    root_logger.addHandler(handler)
+    root_logger.setLevel(min_level)
+    
+    _structlog_configured = True

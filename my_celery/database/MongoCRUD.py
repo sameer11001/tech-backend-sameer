@@ -3,6 +3,7 @@ from datetime import datetime, timezone
 from pydantic import BaseModel
 from odmantic import Model, SyncEngine
 from celery.utils.log import get_task_logger
+
 T = TypeVar("T", bound=Model)
 logger = get_task_logger(__name__)
 
@@ -24,7 +25,8 @@ class MongoCRUD(Generic[T]):
         return self.engine.find_one(self.model, self.model.id == id)
 
     def find_one(self, filters: Dict[str, Any]) -> Optional[T]:
-        return self.engine.find_one(self.model, **filters)
+        query = [getattr(self.model, k) == v for k, v in filters.items()]
+        return self.engine.find_one(self.model, *query)
 
     def find_many(
         self,

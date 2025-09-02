@@ -1,3 +1,4 @@
+from asyncio.log import logger
 from aio_pika import ExchangeType, Message, RobustConnection
 import msgspec
 import uuid6
@@ -39,15 +40,11 @@ class ChatBotTriggerPublisher:
             )
             await exchange.publish(msg, routing_key=routing_key)
     
-    async def trigger_chatbot_event(self, conversation_id:str , chatbot_id: str, recipient_number: str):
+    async def trigger_chatbot_event(self, data_body: dict):
         payload = {
             "id": str(uuid6.uuid7()),
             "task": "my_celery.tasks.trigger_chatbot_task",
-            "args": [{
-                "conversation_id": conversation_id,
-                "chatbot_id": chatbot_id,
-                "recipient_number" : recipient_number
-            }],
+            "args": [data_body],
             "kwargs": {},
             "retries": 5,
             "eta": None

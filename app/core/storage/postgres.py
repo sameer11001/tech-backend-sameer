@@ -24,6 +24,10 @@ class PostgresDatabase:
         
     def create_session(self) -> AsyncSession:
         return self._session_factory()
+    
+    async def init_db(self) -> None:
+        async with self._engine.begin() as conn:
+            await conn.run_sync(SQLModel.metadata.create_all)
 
 async def create_session(db_instance: PostgresDatabase):
     session = db_instance.create_session()

@@ -145,24 +145,7 @@ class FlowNodeResponseBuilder:
     def _extract_header(self, body_data: Dict[str, Any]) -> Optional[InteractiveHeaderResponse]:
         header = None
         
-        whatsapp_interactive = body_data.get("whatsapp_interactive", {})
-        if whatsapp_interactive and "header" in whatsapp_interactive:
-            header_data = whatsapp_interactive["header"]
-            header_type = HeaderType(header_data.get("type", "text"))
-            
-            if header_type == HeaderType.TEXT:
-                header = InteractiveHeaderResponse(
-                    type=header_type,
-                    text=header_data.get("text")
-                )
-            else:
-                media_data = body_data.get("header", {})
-                header = InteractiveHeaderResponse(
-                    type=header_type,
-                    media=media_data if media_data.get("type") in ["image", "video", "audio", "document"] else None
-                )
-        
-        elif "header" in body_data:
+        if "header" in body_data:
             header_data = body_data["header"]
             if isinstance(header_data, dict) and header_data:
                 header_type_str = header_data.get("type", "text")
@@ -175,7 +158,7 @@ class FlowNodeResponseBuilder:
                         )
                     else:
                         header = InteractiveHeaderResponse(
-                            type=header_type,
+                            type= "document" if header_type == HeaderType.APPLICATION else header_type,
                             media=header_data
                         )
                 except ValueError:

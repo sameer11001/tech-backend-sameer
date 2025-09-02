@@ -7,7 +7,6 @@ import msgspec
 whatsapp_exchange = Exchange("whatsapp_default_exchange", type="direct", durable=True)
 broadcast_exchange = Exchange("message_broadcast_exchange", type="direct", durable=True)
 trigger_chatbot_exchange = Exchange("trigger_chatbot_exchange", type="direct", durable=True)
-chatbot_reply_exchange = Exchange("chatbot_replies_exchange", type="direct", durable=True)
 chatbot_flow_exchange = Exchange("chatbot_flow_exchange", type="direct", durable=True)
 message_hook_received_exchange = Exchange("message_hook_received_exchange", type="direct", durable=True)
 system_logs_exchange = Exchange("system_logs_exchange", type="direct", durable=True)
@@ -16,9 +15,8 @@ test_flow_exchange = Exchange("test_flow_exchange", type="direct", durable=True)
 QUEUES = [
     Queue("whatsapp_message_queue", whatsapp_exchange, routing_key="chat_messages", durable=True, delivery_mode=2),
     Queue("message_broadcast_queue", broadcast_exchange, routing_key="broadcast_messages", durable=True, delivery_mode=2),
-    Queue("trigger_chatbot_queue", trigger_chatbot_exchange, durable=True, delivery_mode=2),
+    Queue("trigger_chatbot_queue", trigger_chatbot_exchange,routing_key="trigger_chatbot_event", durable=True, delivery_mode=2),
     Queue("chatbot_flow_queue", chatbot_flow_exchange, routing_key="chatbot_flow_event", durable=True, delivery_mode=2),
-    Queue("chatbot_replies_queue", exchange=chatbot_reply_exchange, routing_key="chatbot_replies_event", durable=True, delivery_mode=2),
     Queue("message_hook_received_queue", message_hook_received_exchange, routing_key="message_hook_received_event", durable=True, delivery_mode=2),
     Queue("system_logs_queue", system_logs_exchange, routing_key="system_logs_event", durable=True, delivery_mode=2),
     Queue("test_flow_queue", test_flow_exchange, routing_key="test_flow_event", durable=True, delivery_mode=2),

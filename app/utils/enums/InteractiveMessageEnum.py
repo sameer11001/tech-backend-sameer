@@ -17,3 +17,4 @@ class HeaderType(str, Enum):
     AUDIO = "audio"
     DOCUMENT = "document"
     MEDIA = "media"
+    APPLICATION = "application"

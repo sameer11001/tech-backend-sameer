@@ -21,7 +21,8 @@ class Container(containers.DeclarativeContainer):
             'app.core.controllers.BaseController',
             'app.annotations.v1.controllers.NoteController',
             'app.chat_bot.v1.controllers.ChatBotController',
-            'app.events.app_events_route'
+            'app.events.app_events_route',
+            'app.events.sub.ChatBotReplyEvent'
         ]
     )
     
@@ -307,7 +308,7 @@ class Container(containers.DeclarativeContainer):
     chat_bot_add_flow_node = providers.Factory(AddFlowNode, chat_bot_service = chat_bot_service, business_service = business_profile_service,whatsapp_media_api = whatsapp_media_api,s3_bucket_service = s3_bucket_service, aws_region = config.AWS_REGION, aws_s3_bucket_name = config.S3_BUCKET_NAME, mongo_crud_chat_bot = mongo_crud_chat_bot)
     chat_bot_get_chat_bots = providers.Factory(GetChatBots, chat_bot_service = chat_bot_service,user_service = user_service)
     chat_bot_get_flow_nodes = providers.Factory(GetChatBotFlow, chat_bot_service = chat_bot_service,mongo_crud_chat_bot_flow = mongo_crud_chat_bot)
-    chat_bot_trigger_chat_bot = providers.Factory(TriggerChatBot, chat_bot_service = chat_bot_service,conversation_service = conversation_service)
+    chat_bot_trigger_chat_bot = providers.Factory(TriggerChatBot, chat_bot_service = chat_bot_service,conversation_service = conversation_service,trigger_publisher = chat_bot_trigger_publisher, business_service = business_profile_service,contact_service = contact_service)
     #----- error and logger -----
     error_handler = providers.Singleton(ErrorHandler, log_service = system_log_service)    
 

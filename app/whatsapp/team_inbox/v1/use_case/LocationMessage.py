@@ -1,5 +1,4 @@
-from datetime import datetime, timezone
-from typing import Any, Dict, Optional
+from typing import Any, Dict
 from app.annotations.services.ContactService import ContactService
 from app.core.logs.logger import get_logger
 
@@ -7,7 +6,6 @@ from app.core.exceptions.custom_exceptions.EntityNotFoundException import Entity
 from app.core.repository.MongoRepository import MongoCRUD
 from app.core.schemas.BaseResponse import ApiResponse
 from app.core.storage.redis import AsyncRedisService
-from app.real_time.socketio.socket_gateway import SocketMessageGateway
 from app.user_management.user.models.User import User
 from app.user_management.user.services.UserService import UserService
 from app.utils.RedisHelper import RedisHelper
@@ -109,6 +107,10 @@ class LocationMessage:
                 redis_last_message,
                 ttl=None
                 )
+            
+            redis_chatbot_context = RedisHelper.redis_chatbot_context_key(conversation_id=str(conversation.id))
+            await self.redis_service.delete(redis_chatbot_context)
+            
             message_response = {
                 "data": {
                 "_id": meta.id,
@@ -141,4 +143,6 @@ class LocationMessage:
         )  
         if not conversation:
             raise EntityNotFoundException("Conversation not found") 
+        await self.conversation_service.update(conversation.id, {"chatbot_triggered": False})
+        
         return conversation 

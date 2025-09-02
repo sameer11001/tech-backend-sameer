@@ -8,7 +8,7 @@ class ChatbotContextService:
     
     def __init__(self, redis_client: RedisService):
         self.redis_client = redis_client
-        self.context_ttl = 86400 * 7  
+        self.context_ttl = 86400 * 1  
         
     def set_chatbot_context(
         self, 

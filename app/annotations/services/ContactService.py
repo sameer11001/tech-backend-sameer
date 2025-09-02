@@ -23,7 +23,7 @@ class ContactService(BaseService[Contact]):
         return await self.repository.get_by_client_id(client_id, page, limit, search, sort)
     
     async def get_by_business_profile_and_contact_number(self, business_profile_number: str, contact_number: str) -> Contact:
-        contact_phone_number = "+"+contact_number
+        contact_phone_number = contact_number if contact_number.startswith("+") else f"+{contact_number}"
         country_code, national_number=Helper.number_parsed(contact_phone_number)
         return await self.repository.get_by_business_profile_and_contact_number(business_profile_number, national_number)
     

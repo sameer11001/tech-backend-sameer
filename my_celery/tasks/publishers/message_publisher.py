@@ -1,29 +1,22 @@
 from typing import Any, Dict
 from celery import current_app
-from kombu import Exchange, Queue
-import logging
+from kombu import Exchange
+import structlog
 
-logger = logging.getLogger(__name__)
+logger = structlog.get_logger()
 
 def publish_flow_node_event(payload: Dict[str, Any]) -> bool:
 
     try:
         flow_node_exchange = Exchange("chatbot_flow_exchange", type="direct", durable=True)
-        flow_node_queue = Queue(
-            "chatbot_flow_queue", 
-            exchange=flow_node_exchange, 
-            routing_key="chatbot_flow_event", 
-            durable=True, 
-            delivery_mode=2
-        )
-        
+
         with current_app.producer_pool.acquire(block=True) as producer:
             producer.publish(
                 payload,
                 serializer="msgpack",
-                declare=[flow_node_queue],
                 exchange=flow_node_exchange,
                 routing_key="chatbot_flow_event",
+                delivery_mode=2,
                 wrap=False,
                 retry=True,
                 retry_policy={
@@ -44,21 +37,14 @@ def publish_chatbot_reply_event(payload: Dict[str, Any]) -> bool:
 
     try:
         chatbot_reply_exchange = Exchange("chatbot_replies_exchange", type="direct", durable=True)
-        reply_queue = Queue(
-            "chatbot_replies_queue", 
-            exchange=chatbot_reply_exchange, 
-            routing_key="chatbot_replies_event", 
-            durable=True, 
-            delivery_mode=2
-        )
         
         with current_app.producer_pool.acquire(block=True) as producer:
             producer.publish(
                 payload,
                 serializer="msgpack",
-                declare=[reply_queue],
                 exchange=chatbot_reply_exchange,
                 routing_key="chatbot_replies_event",
+                delivery_mode=2,
                 wrap=False,
                 retry=True,
                 retry_policy={
@@ -68,7 +54,7 @@ def publish_chatbot_reply_event(payload: Dict[str, Any]) -> bool:
                     "interval_max": 5.0
                 }
             )
-        logger.info(f"Successfully published chatbot reply for chat_id: {payload.get('chat_id', 'unknown')}")
+        logger.info(f"Successfully published chatbot reply for chat_id: {payload.get('conversation_id', 'unknown')}")
         return True
     except Exception as e:
         logger.error(f"Failed to publish chatbot reply event: {str(e)}")

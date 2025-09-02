@@ -66,12 +66,7 @@ class LoggingMiddleware(BaseHTTPMiddleware):
             duration_ms = (time.time() - start_time) * 1000
             
             try:
-                if hasattr(self.system_log_service, 'log_business_event'):
-                    log_service = self.system_log_service
-                else:
-                    log_service = self.system_log_service()
-                
-                await log_service.log_business_event(
+                await self.system_log_service.log_business_event(
                     event_type="http_request",
                     message=f"{request.method} {request.url.path} - {response.status_code} ({round(duration_ms, 2)}ms)",
                     level="info",

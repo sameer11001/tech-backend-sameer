@@ -11,7 +11,7 @@ from my_celery.utils.DateTimeHelper import DateTimeHelper
 from my_celery.utils.Helper import Helper
 
 RETRY_COUNTDOWN = 60
-MAX_RETRIES = 5
+MAX_RETRIES = 1
 
 @celery_app.task(
     name="my_celery.tasks.template_broadcast",

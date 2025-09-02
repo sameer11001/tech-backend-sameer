@@ -1,6 +1,4 @@
 import json
-from uuid import UUID
-
 from app.core.logs.logger import get_logger
 from app.core.repository.MongoRepository import MongoCRUD
 from app.core.schemas.BaseResponse import ApiResponse

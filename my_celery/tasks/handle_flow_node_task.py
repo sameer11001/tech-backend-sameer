@@ -1,7 +1,9 @@
 from typing import Optional
+from uuid import UUID
 
 from sqlalchemy import text
 from sqlalchemy.exc import NoResultFound
+import structlog
 from my_celery.celery_app import celery_app
 from my_celery.database.db_config import get_db
 from my_celery.models.ChatBot import FlowNode
@@ -12,12 +14,11 @@ from my_celery.services.MessageService import message_node_handler
 from my_celery.tasks.publishers.message_publisher import publish_chatbot_reply_event, publish_flow_node_event
 from my_celery.utils.DateTimeHelper import DateTimeHelper
 from my_celery.services.ChatbotContextService import ChatbotContextService
-import logging
 
-logger = logging.getLogger(__name__)
+logger = structlog.get_logger(__name__)
 
 RETRY_COUNTDOWN = 60  
-MAX_RETRIES = 5
+MAX_RETRIES = 1
 
 def conversation_end_triggered(conversation_id: str):
     try:
@@ -47,7 +48,9 @@ def get_next_node(current_node_id: str, button_id: Optional[str] = None, user_re
         chatbot_context_service : ChatbotContextService = get_chatbot_context_service()
         
         chatbot_crud = get_chatbot_crud()
-        current_node = chatbot_crud.find_one({"id": current_node_id})
+        current_node = chatbot_crud.get_by_id(current_node_id)
+        
+        logger.debug(f"Current node: {current_node}")
         
         if not current_node:
             logger.warning(f"Current node not found: {current_node_id}")
@@ -59,7 +62,7 @@ def get_next_node(current_node_id: str, button_id: Optional[str] = None, user_re
                 
                 if next_node_id:
                     logger.info(f"Found next node from Redis: {next_node_id}")
-                    return chatbot_crud.find_one({"id": next_node_id})
+                    return chatbot_crud.get_by_id(next_node_id)
             except Exception as e:
                 logger.warning(f"Redis lookup failed, falling back to database: {e}")
             
@@ -78,7 +81,7 @@ def get_next_node(current_node_id: str, button_id: Optional[str] = None, user_re
                 logger.warning(f"No next_node_id found for button {button_id}")
                 return None
 
-            return chatbot_crud.find_one({"id": next_node_id})
+            return chatbot_crud.get_by_id(next_node_id)
 
         if user_response and current_node.type.value == "question":
             try:
@@ -93,8 +96,8 @@ def get_next_node(current_node_id: str, button_id: Optional[str] = None, user_re
                 logger.warning(f"Failed to store user response: {e}")
             
             if hasattr(current_node, 'next_nodes') and current_node.next_nodes:
-                next_node_id = current_node.next_nodes[0]
-                return chatbot_crud.find_one({"id": next_node_id})
+                next_node_id = current_node.next_nodes
+                return chatbot_crud.get_by_id(next_node_id)
             
             return None
 
@@ -102,13 +105,16 @@ def get_next_node(current_node_id: str, button_id: Optional[str] = None, user_re
             logger.info(f"Node {current_node_id} has no next_nodes")
             return None
 
-        next_node_id = current_node.next_nodes[0]
+        next_node_id = current_node.next_nodes
         if not next_node_id:
             logger.warning(f"Empty next_node_id in node {current_node_id}")
             return None
 
-        return chatbot_crud.find_one({"id": next_node_id})
-
+        flow_node = chatbot_crud.get_by_id(next_node_id)
+        
+        logger.debug(f"Found next node: {flow_node}")
+        return flow_node
+    
     except Exception as e:
         logger.error(f"Failed to get next node: {e}")
         raise RuntimeError(f"Failed to get next node: {e}")
@@ -168,20 +174,20 @@ def handle_flow_node_task(self, data):
         user_response = data.get("user_response")
         business_data = data["business_data"]
         
-        logger.info(f"Processing flow node task: conversation={conversation_id},"
+        self.logger.info(f"Processing flow node task: conversation={conversation_id},"
                     f"current_node={current_node_id}, button_id={button_id}, "
                     f"user_response={user_response is not None}")
                 
         next_node = get_next_node(current_node_id, button_id, user_response)
         
         if not next_node:
-            logger.info(f"No next node found, ending flow. conversation={conversation_id}, "
+            self.logger.info(f"No next node found, ending flow. conversation={conversation_id}, "
                         f"current_node={current_node_id}, button_id={button_id}")
             
             handle_flow_completion(conversation_id, current_node_id, business_data)
             return {"status": "completed", "conversation_id": conversation_id}
         
-        logger.info(f"Found next node: {next_node.id} (type: {next_node.type.value})")
+        self.logger.info(f"Found next node: {next_node.id} (type: {next_node.type.value})")
         
         try:
             chatbot_context_service.update_current_node(
@@ -189,9 +195,9 @@ def handle_flow_node_task(self, data):
                 new_current_node_id=next_node.id,
                 previous_node_id=current_node_id
             )
-            logger.info(f"Updated chatbot context: {current_node_id} -> {next_node.id}")
+            self.logger.info(f"Updated chatbot context: {current_node_id} -> {next_node.id}")
         except Exception as e:
-            logger.warning(f"Failed to update chatbot context: {e}")
+            self.logger.warning(f"Failed to update chatbot context: {e}")
         
         if button_id:
             try:
@@ -202,18 +208,17 @@ def handle_flow_node_task(self, data):
                     selection_data={"button_id": button_id, "next_node_id": next_node.id}
                 )
             except Exception as e:
-                logger.warning(f"Failed to store user selection: {e}")
+                self.logger.warning(f"Failed to store user selection: {e}")
         
         try:
             message_docs = message_node_handler(
                 message_node=next_node,
                 business_data=business_data,
                 conversation_id=conversation_id,
-                user_input=user_response
             )
-            logger.info(f"Processed node {next_node.id}, created {len(message_docs)} messages")
+            self.logger.info(f"Processed node {next_node.id}, created {len(message_docs)} messages")
         except Exception as e:
-            logger.error(f"Failed to process message node {next_node.id}: {e}")
+            self.logger.error(f"Failed to process message node {next_node.id}: {e}")
             self.retry(exc=e)
             return
         
@@ -233,15 +238,13 @@ def handle_flow_node_task(self, data):
                     is_final_node=next_node.is_final,
                     business_data=business_data,
                     event_type="chatbot_reply",
-                    user_input=user_response,
-                    button_clicked=button_id
                 )
                 
                 publish_chatbot_reply_event(reply_payload.to_dict())
-                logger.info(f"Published reply event for message: {doc.id}")
+                self.logger.info(f"Published reply event for message: {doc.id}")
                 
             except Exception as e:
-                logger.warning(f"Failed to publish reply event for message {doc.id}: {e}")
+                self.logger.warning(f"Failed to publish reply event for message {doc.id}: {e}")
         
         should_continue_flow = (
             not next_node.is_final and 
@@ -249,15 +252,15 @@ def handle_flow_node_task(self, data):
         )
         
         if should_continue_flow:
-            logger.info(f"Continuing flow automatically for node type: {next_node.type.value}")
+            self.logger.info(f"Continuing flow automatically for node type: {next_node.type.value}")
             next_payload = {
                 "conversation_id": conversation_id,
                 "current_node_id": next_node.id,
                 "business_data": business_data
             }
-            publish_flow_node_event(next_payload)
+            handle_flow_node_task.delay(next_payload)
         else:
-            logger.info(f"Flow paused at node {next_node.id} (type: {next_node.type.value}, final: {next_node.is_final})")
+            self.logger.info(f"Flow paused at node {next_node.id} (type: {next_node.type.value}, final: {next_node.is_final})")
         
         return {
             "status": "success",
@@ -269,5 +272,5 @@ def handle_flow_node_task(self, data):
         }
         
     except Exception as exc:
-        logger.error(f"Flow node handling failed: {exc}", exc_info=True)
+        self.logger.error(f"Flow node handling failed: {exc}", exc_info=True)
         self.retry(exc=exc)

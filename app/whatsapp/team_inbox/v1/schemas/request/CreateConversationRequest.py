@@ -10,7 +10,7 @@ class CreateConversationRequest(BaseModel):
     template_id:str 
     parameters:Optional[List[str]] = None
 
-    @model_validator
+    @model_validator(mode="after")
     def validate_full_phone(cls, values):
         country_code = values.get("contact_country_code")
         phone_number = values.get("contact_phone_number")

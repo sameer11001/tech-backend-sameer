@@ -1,4 +1,5 @@
 
+from uuid import UUID
 from app.core.exceptions.custom_exceptions.EntityNotFoundException import EntityNotFoundException
 from app.core.repository.MongoRepository import MongoCRUD
 from app.core.schemas.BaseResponse import ApiResponse
@@ -32,7 +33,7 @@ class DeleteTemplate:
         self.mongo_crud = mongo_crud
 
         
-    async def execute(self, user_id: str, name: str, template_id: str = None):
+    async def execute(self, user_id: str, name: str, template_id: UUID = None):
 
         user: User = await self.user_service.get(user_id)
         client: Client = user.client

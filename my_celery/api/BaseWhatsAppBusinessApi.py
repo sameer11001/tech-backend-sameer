@@ -25,7 +25,7 @@ def send_template_message(accessToken: str , phone_number_id:str,payload: dict[s
         url = f"{base_url}/{phone_number_id}/messages"
         headers = _get_headers(accessToken, content_type = "application/json")
         
-        response : Response = client.post(url, headers=headers, json_data=payload)
+        response : Response = client.post(url, headers=headers, json=payload)
         response.raise_for_status()
         response_data = response.json()
         return response_data

@@ -133,21 +133,25 @@ class MessageHook:
             
             msg_type = msg.get("type")
             
-            await self.message_hook_received_publisher.publish_message(
-                message_body=data, conversation_id=str(conversation.id)
-            )
+            # await self.message_hook_received_publisher.publish_message(
+            #     message_body=data, conversation_id=str(conversation.id)
+            # )
             
             await logger.adebug("Message data processed", message_type=msg_type)
             await self.socket_message.emit_received_message(
                 message=data, phone_number_id=phone_id, conversation_id=str(conversation.id)
             )
             await self._set_conversation_expiration(conversation.id, logger)
+            
+            await self._handle_chatbot_interaction(msg, conversation, logger)
+            
             await self.save_message.process_message(
                 message_data=data, conversation_id=conversation.id, contact_id=conversation.contact_id
             )
+            
 
     async def _handle_chatbot_interaction(self, msg: Dict[str, Any], conversation: Conversation, 
-                                        data: Dict[str, Any], logger):
+                                        logger):
         interactive = msg.get("interactive", {})
         interactive_type = interactive.get("type")
         
@@ -164,9 +168,9 @@ class MessageHook:
             await self._process_chatbot_list_selection(conversation, list_id, msg, logger)
 
     async def _handle_text_response_to_chatbot(self, msg: Dict[str, Any], conversation: Conversation, 
-                                                data: Dict[str, Any], logger):
+                                                logger):
         try:
-            chatbot_context = await self.chatbot_context_service.get_chatbot_context(str(conversation.id))
+            chatbot_context = await self.chatbot_context_service.get_chatbot_context(conversation.id)
             
             if not chatbot_context:
                 await logger.adebug("No chatbot context found for conversation")
@@ -189,7 +193,7 @@ class MessageHook:
                 
                 await self.chatbot_flow_publisher.publish_flow_node_event(flow_payload)
                 await logger.adebug("Published chatbot flow event for text response", 
-                                 text_preview=text_content[:50])
+                                text_preview=text_content[:50])
                 
         except Exception as e:
             await logger.aexception("Error handling text response to chatbot", error=str(e))

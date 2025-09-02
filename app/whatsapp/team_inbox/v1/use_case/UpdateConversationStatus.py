@@ -1,4 +1,3 @@
-
 from app.core.exceptions.custom_exceptions.BadRequestException import BadRequestException
 from app.core.exceptions.custom_exceptions.EntityNotFoundException import EntityNotFoundException
 from app.core.schemas.BaseResponse import ApiResponse

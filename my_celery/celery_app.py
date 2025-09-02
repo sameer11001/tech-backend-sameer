@@ -17,21 +17,30 @@ celery_app.conf.update(
     task_queues=celery_config.QUEUES,
     task_default_exchange="direct",
     task_routes=celery_config.TASK_ROUTES,
-    task_create_missing_queues=True,
-    timezone="UTC",
-    enable_utc=True,
+    task_create_missing_queues=True,    
     task_reject_on_worker_lost=True,
     task_ignore_result=True,
-    worker_hijack_root_logger=False,
-    worker_redirect_stdouts=True,
     task_acks_late=True,
-    task_acks_on_failure_or_timeout=False,
-    broker_pool_limit=10,
-    worker_concurrency=8,
+    task_acks_on_failure_or_timeout=True,
+    task_always_eager=False,
+    task_eager_propagates=False,
+    task_store_eager_result=False,
+    
+    worker_concurrency=4,
     worker_disable_rate_limits=True,
     worker_max_tasks_per_child=300,
     worker_prefetch_multiplier=1,
+    worker_hijack_root_logger=False,
+    worker_redirect_stdouts=True,
+    
+    broker_connection_max_retries=10,
+    broker_pool_limit=10,
     broker_connection_retry_on_startup=True,
+    broker_connection_retry=True,
+    
+    visibility_timeout=300,
+    timezone="UTC",
+    enable_utc=True,
 )
 
 celery_app.autodiscover_tasks(CELERY_TASK)

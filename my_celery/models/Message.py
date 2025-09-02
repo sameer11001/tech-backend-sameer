@@ -12,6 +12,7 @@ class Message(Model):
     content: Optional[dict] = None
     is_from_contact: Optional[bool] = None
     member_id:  Optional[UUID] = None
+    chat_bot_id: Optional[UUID] = None
 
     created_at: datetime
     updated_at: datetime

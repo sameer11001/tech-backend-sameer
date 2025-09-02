@@ -4,13 +4,9 @@ from uuid import UUID
 
 from app.core.exceptions.custom_exceptions.EntityNotFoundException import EntityNotFoundException
 from app.core.repository.MongoRepository import MongoCRUD
-from app.core.schemas.PageableResponse import PageableResponse
-from app.core.storage.redis import AsyncRedisService
 from app.user_management.user.services.UserService import UserService
-from app.utils.RedisHelper import RedisHelper
 from app.whatsapp.team_inbox.models.Message import Message
 from app.whatsapp.team_inbox.services.ConversationService import ConversationService
-from app.whatsapp.team_inbox.utils.conversation_status import ConversationStatus
 
 class GetConversationMessages:
     def __init__(self, conversation_service: ConversationService,

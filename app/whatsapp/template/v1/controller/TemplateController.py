@@ -1,3 +1,4 @@
+from uuid import UUID
 from fastapi import APIRouter, Path, Query
 from fastapi.params import Depends
 from app.core.security.JwtUtility import get_current_user
@@ -88,7 +89,7 @@ async def create_template(
 @inject
 async def delete_template(
     name: str = Path(..., description="The name of the template to delete."),
-    template_id: str = Query(None, description="The unique template ID for deletion by ID."),
+    template_id: UUID = Query(None, description="The unique template ID for deletion by ID."),
     delete_template_use_case: DeleteTemplate = Depends(
         Provide[Container.whatsapp_template_delete_template]
     ),

@@ -177,7 +177,19 @@ async def get_chat_flow_node(
 async def trigger_chat_bot(
     request_body: TriggerChatBotRequest,
     trigger_chat_bot: TriggerChatBot = Depends(Provide[Container.chat_bot_trigger_chat_bot]),
+    token: dict = Depends(get_current_user),
 ):
-    pass
+    try:
+        response = await trigger_chat_bot.execute(token["business_profile_id"],request_body)
+        return response
+    
+    except UnAuthorizedException as e:
+        raise e
+    except DataBaseException as e:
+        raise e
+    except ClientException as e:
+        raise e
+    except Exception as e:
+        raise ClientException(str(e))
 
 

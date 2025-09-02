@@ -12,7 +12,6 @@ from app.core.storage.redis import AsyncRedisService
 from app.user_management.user.models.Client import Client
 from app.user_management.user.models.User import User
 
-
 from app.user_management.user.services.UserService import UserService
 from app.utils.RedisHelper import RedisHelper
 from app.utils.validators.validate_media import validate_media
@@ -155,6 +154,10 @@ class MediaMessage:
             
             redis_last_message = RedisHelper.redis_conversation_last_message_data(last_message=content_type ,last_message_time=f"{message_created_data.created_at}")
             await self.redis_service.set(key=RedisHelper.redis_conversation_last_message_key(str(conversation.id)),value= redis_last_message,ttl=None)            
+            
+            redis_chatbot_context = RedisHelper.redis_chatbot_context_key(conversation_id=str(conversation.id))
+            await self.redis_service.delete(redis_chatbot_context)
+            
             message_response = {
                 "data": {
                 "_id": message_created_data.id,
@@ -186,4 +189,6 @@ class MediaMessage:
         )  
         if not conversation:
             raise EntityNotFoundException("Conversation not found") 
+        await self.conversation_service.update(conversation.id, {"chatbot_triggered": False})
+        
         return conversation

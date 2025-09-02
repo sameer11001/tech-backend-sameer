@@ -1,4 +1,4 @@
-from datetime import datetime, timezone
+from datetime import datetime
 from typing import Optional
 from uuid import UUID
 from pydantic import Field
@@ -20,7 +20,7 @@ class Message(Document, BaseModelNoNone):
     context: Optional[dict] = None
     is_from_contact: Optional[bool] = None
     member_id: Optional[UUID] = None
-
+    chat_bot_id: Optional[UUID] = Indexed(default=None)
     created_at: datetime = Field(
         default_factory= DateTimeHelper.now_utc
     )
@@ -41,6 +41,7 @@ class Message(Document, BaseModelNoNone):
                 ("_id", DESCENDING),
             ],
             "wa_message_id",
+            "chat_bot_id",
         ]
 
     class Config:
