@@ -1,4 +1,3 @@
-from fastapi import logger
 from app.annotations.models.Contact import Contact
 from app.annotations.services.ContactService import ContactService
 from app.chat_bot.models.ChatBotMeta import ChatBotMeta
@@ -11,8 +10,6 @@ from app.whatsapp.business_profile.v1.models.BusinessProfile import BusinessProf
 from app.whatsapp.business_profile.v1.services.BusinessProfileService import BusinessProfileService
 from app.whatsapp.team_inbox.models.Conversation import Conversation
 from app.whatsapp.team_inbox.services.ConversationService import ConversationService
-
-
 
 class TriggerChatBot:
     def __init__(
@@ -51,8 +48,10 @@ class TriggerChatBot:
 
             await self.conversation_service.update(
                 conversation.id, 
-                {"chatbot_triggered": True},
-                commit=False
+                {
+                    "chatbot_triggered": True,
+                    "chatbot_id": chat_bot.id
+                }
             )
             
             current_triggered = chat_bot.triggered if chat_bot.triggered else 0
@@ -60,8 +59,6 @@ class TriggerChatBot:
                 chat_bot.id, 
                 {"triggered": current_triggered + 1}
             )
-            
-
             
             return ApiResponse(message="Chatbot triggered successfully", status_code=204)
         except Exception as e:

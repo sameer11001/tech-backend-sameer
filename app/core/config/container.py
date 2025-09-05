@@ -299,7 +299,29 @@ class Container(containers.DeclarativeContainer):
    
     #----- RealTime -----
     template_hook = providers.Singleton(TemplateHook, template_service = template_service, client_service = client_service, business_profile_service = business_profile_service, mongo_crud = mongo_crud_template, wa_template_api = whatsapp_template_api)
-    message_hook = providers.Singleton(MessageHook, message_service = message_service,conversation_service = conversation_service, save_message = save_message_document, contact_service = contact_service, client_service = client_service, assignment_service = assignment_service,team_service = team_service, business_profile_service = business_profile_service ,message_publisher = message_publisher, chatbot_context_service = chat_bot_context_service, chatbot_flow_publisher = chat_bot_flow_publisher, media_api = whatsapp_media_api,redis_service = async_redis_service,mongo_message = mongo_crud_message,socket_message = socket_message_gateway, s3_service = s3_bucket_service,message_hook_received_publisher = message_hook_received_publisher, aws_s3_bucket = config.S3_BUCKET_NAME, aws_region = config.AWS_REGION)
+    message_hook = providers.Singleton(
+        MessageHook, 
+        message_service = message_service,
+        conversation_service = conversation_service, 
+        save_message = save_message_document, 
+        contact_service = contact_service, 
+        client_service = client_service, 
+        assignment_service = assignment_service,
+        team_service = team_service, 
+        business_profile_service = business_profile_service ,
+        message_publisher = message_publisher, 
+        chatbot_context_service = chat_bot_context_service, 
+        chatbot_flow_publisher = chat_bot_flow_publisher, 
+        media_api = whatsapp_media_api,
+        redis_service = async_redis_service,
+        mongo_message = mongo_crud_message,
+        mongo_flow = mongo_crud_chat_bot,
+        socket_message = socket_message_gateway, 
+        s3_service = s3_bucket_service,
+        message_hook_received_publisher = message_hook_received_publisher, 
+        aws_s3_bucket = config.S3_BUCKET_NAME, 
+        aws_region = config.AWS_REGION
+        )
     webhook_dispatcher = providers.Factory(WebhookDispatcher, message_hook = message_hook, template_hook = template_hook)
     
     #----- ChatBot -----

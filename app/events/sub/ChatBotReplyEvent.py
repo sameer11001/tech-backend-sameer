@@ -8,13 +8,17 @@ from dependency_injector.wiring import Provide, inject
 from app.core.logs.logger import get_logger
 from app.real_time.socketio.socket_gateway import SocketMessageGateway
 
-rabbitmq_router : RabbitRouter = RabbitRouter(f"{settings.RABBITMQ_URI}")
+rabbitmq_router : RabbitRouter = RabbitRouter(f"{settings.RABBITMQ_URI}",max_consumers=1)
 
 logger = get_logger(__name__)
 
 @rabbitmq_router.subscriber(
     queue=RabbitQueue(name="chatbot_replies_queue", durable=True, routing_key="chatbot_replies_event"),
-    exchange=RabbitExchange(name="chatbot_replies_exchange", type=ExchangeType.DIRECT, durable=True)   
+    exchange=RabbitExchange(name="chatbot_replies_exchange", type=ExchangeType.DIRECT, durable=True),
+    consume_args={
+        "prefetch_count": 1,  
+        "prefetch_size": 0,
+    }
 )
 @inject
 async def handle_chatbot_reply_event(payload: dict, socketio : SocketMessageGateway = Depends(Provide[Container.socket_message_gateway])):

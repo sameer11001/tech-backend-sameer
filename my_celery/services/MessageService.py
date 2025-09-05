@@ -7,7 +7,7 @@ from my_celery.models.schemas.ChatbotReplyEventPayload import ChatbotReplyEventP
 from my_celery.api.BaseWhatsAppBusinessApi import send_interactive_message, send_media_message, send_text_message
 from my_celery.database.db_config import get_db
 from my_celery.models.ChatBot import FlowNode
-from my_celery.signals.lifecycle import get_message_crud
+from my_celery.signals.lifecycle import get_chatbot_context_service, get_message_crud
 from my_celery.utils.DateTimeHelper import DateTimeHelper
 from my_celery.utils.enums.FlowNodeType import FlowNodeType
 from my_celery.models.Message import Message
@@ -204,7 +204,8 @@ def _persist_outgoing_message(
                 "business_token": business_data.get("business_token"),
                 "business_phone_number_id": business_data.get("business_phone_number_id"),
                 "recipient_number": business_data.get("recipient_number"),
-                "contact_id": business_data.get("contact_id")
+                "contact_id": business_data.get("contact_id"),
+                "chatbot_id": business_data["chatbot_id"]
             }
         )
         
@@ -306,6 +307,7 @@ def _handle_content_items(message_body: dict, business_data: dict, conversation_
     return message_docs
 
 def _handle_interactive_buttons_node(message_node: FlowNode, business_data: dict, conversation_id: str):
+    chatbot_context_service = get_chatbot_context_service()
     body = message_node.body or {}
     whatsapp_interactive = body.get("whatsapp_interactive")
     if not whatsapp_interactive:
@@ -331,14 +333,13 @@ def _handle_interactive_buttons_node(message_node: FlowNode, business_data: dict
 
     node_buttons = getattr(message_node, "buttons", []) or []
     for btn in node_buttons:
-        mapping={
-            "current_node": message_node.id,
-            "prev_node": "",
-            "next_node": btn.next_node_id,
-            "button_id": btn.id,
-            "chatbot_id": business_data["chatbot_id"],
-            "created_at": DateTimeHelper.now_utc().isoformat()
-        }
+        chatbot_context_service.store_next_node_for_button(
+            chatbot_id=business_data["chatbot_id"],
+            previous_node_id="",
+            current_node_id=message_node.id,
+            button_id=btn.id,
+            next_node_id=btn.next_node_id
+        )
     logger.debug(
         "node_buttons",
         node_id=message_node.id,
@@ -447,22 +448,6 @@ def message_node_handler(message_node: FlowNode, business_data: dict, conversati
                         conversation_id=conversation_id
                     )
                 raise ValueError(f"Unknown message body structure: {message_body}")
-        
-        if not message_node.is_final:
-            logger.debug(
-                    "publishing_flow_node_event_for_continuation",
-                    conversation_id=conversation_id,
-                    node_id=message_node.id
-            ) 
-            from my_celery.tasks.handle_flow_node_task import handle_flow_node_task
-
-            flow_payload = {
-                "conversation_id": conversation_id,
-                "current_node_id": message_node.id,
-                "business_data": business_data
-            }
-            
-            handle_flow_node_task.delay(flow_payload)
         
     elif message_node.type == FlowNodeType.QUESTION:   
         logger.debug(

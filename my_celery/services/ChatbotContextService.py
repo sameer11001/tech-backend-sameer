@@ -30,7 +30,8 @@ class ChatbotContextService:
         key = RedisHelper.redis_chatbot_context_key(conversation_id)
         self.redis_client.set(
             key=key, 
-            value=context
+            value=context,
+            ttl=self.context_ttl
         )
     
     def get_chatbot_context(self, conversation_id: str) -> Optional[Dict[str, Any]]:
@@ -46,23 +47,38 @@ class ChatbotContextService:
         self, 
         conversation_id: str, 
         new_current_node_id: str,
+        chatbot_id: str,
         previous_node_id: Optional[str] = None
     ) -> None:
-        context = self.get_chatbot_context(conversation_id)
-        if not context:
-            return
+        try:
+            context = self.get_chatbot_context(conversation_id)
+            if not context:
+                context = {
+                    "current_node_id": new_current_node_id,
+                    "previous_node_id": previous_node_id,
+                    "chatbot_id": chatbot_id,
+                    "created_at": DateTimeHelper.now_utc(),
+                    "updated_at": DateTimeHelper.now_utc(),
+                }
+                
+            context.update({
+                "previous_node_id": previous_node_id or context.get("current_node_id"),
+                "current_node_id": new_current_node_id,
+                "updated_at": DateTimeHelper.now_utc(),
+            })
             
-        context.update({
-            "previous_node_id": previous_node_id or context.get("current_node_id"),
-            "current_node_id": new_current_node_id,
-            "updated_at": DateTimeHelper.now_utc(),
-        })
-        
-        key = RedisHelper.redis_chatbot_context_key(conversation_id)
-        self.redis_client.set(
-            key=key,
-            value=context
-        )
+            key = RedisHelper.redis_chatbot_context_key(conversation_id)
+            result = self.redis_client.set(
+                key=key,
+                value=context,
+                ttl=self.context_ttl
+            )
+            
+            print(f"Update context result: {result}, key: {key}")
+            
+        except Exception as e:
+            print(f"Error updating chatbot context: {e}")
+            raise
     
     def get_next_node_for_button(
         self, 
@@ -77,7 +93,28 @@ class ChatbotContextService:
             return None
             
         return mapping_data.get("next_node_id")
+    
+    def store_next_node_for_button(
+        self,
+        chatbot_id: str,
+        current_node_id: str,
+        button_id: str,
+        next_node_id,
+        previous_node_id: Optional[str] = None,
+    ):
+        button_data = {
+            "chatbot_id": chatbot_id,
+            "current_node_id": current_node_id,
+            "button_id": button_id,
+            "previous_node_id": previous_node_id,
+            "created_at": DateTimeHelper.now_utc(),
+            "next_node_id": next_node_id,
+        }
+        key = RedisHelper.redis_chatbot_button_key(chatbot_id, current_node_id, button_id)
         
+        self.redis_client.set(key=key, value=button_data, ttl=self.context_ttl)
+        
+    
     def store_contact_response(
         self, 
         conversation_id: str, 
@@ -100,8 +137,9 @@ class ChatbotContextService:
         })
         
         self.redis_client.set(
-            name=key,
-            value=contact_data
+            key=key,
+            value=contact_data,
+            ttl=self.context_ttl
         )
     
     def store_contact_selection(
@@ -127,7 +165,8 @@ class ChatbotContextService:
         
         self.redis_client.set(
             key=key,
-            value=contact_data
+            value=contact_data,
+            ttl=self.context_ttl
         )
     
     def clear_chatbot_context(self, conversation_id: str) -> None:
@@ -142,5 +181,6 @@ class ChatbotContextService:
         
         self.redis_client.set(
             key="test_flow",
-            value=test_data
+            value=test_data,
+            ttl=self.context_ttl
         )

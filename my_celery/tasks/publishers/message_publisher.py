@@ -1,6 +1,6 @@
 from typing import Any, Dict
 from celery import current_app
-from kombu import Exchange
+from kombu import Exchange , Queue
 import structlog
 
 logger = structlog.get_logger()
@@ -37,13 +37,20 @@ def publish_chatbot_reply_event(payload: Dict[str, Any]) -> bool:
 
     try:
         chatbot_reply_exchange = Exchange("chatbot_replies_exchange", type="direct", durable=True)
-        
+        chatbot_reply_queue = Queue(
+            "chatbot_replies_queue", 
+            exchange=chatbot_reply_exchange, 
+            routing_key="chatbot_replies_event", 
+            durable=True, 
+            delivery_mode=2
+        )
         with current_app.producer_pool.acquire(block=True) as producer:
             producer.publish(
                 payload,
                 serializer="msgpack",
                 exchange=chatbot_reply_exchange,
                 routing_key="chatbot_replies_event",
+                declare=[chatbot_reply_queue],
                 delivery_mode=2,
                 wrap=False,
                 retry=True,

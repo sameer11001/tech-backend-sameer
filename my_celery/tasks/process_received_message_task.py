@@ -58,82 +58,6 @@ def _get_business_data_for_conversation(conversation_id: str, message_data: Dict
         logger.error(f"Error getting business data for conversation {conversation_id}: {e}")
         raise
 
-def _process_chatbot_button_click(conversation_id: str, button_id: str, message_data: Dict[str, Any], logger):
-    try:
-        chatbot_context_service = get_chatbot_context_service()
-        
-        chatbot_context = chatbot_context_service.get_chatbot_context(conversation_id)
-        
-        if not chatbot_context:
-            logger.debug(f"No active chatbot context for conversation {conversation_id}")
-            return
-            
-        current_node_id = chatbot_context.get("current_node_id")
-        chatbot_id = chatbot_context.get("chatbot_id")
-        
-        if not current_node_id or not chatbot_id:
-            logger.warning(f"Invalid chatbot context for conversation {conversation_id}")
-            return
-        
-        business_data = _get_business_data_for_conversation(conversation_id, message_data)
-        business_data["chatbot_id"] = chatbot_id
-        
-        flow_payload = {
-            "conversation_id": conversation_id,
-            "current_node_id": current_node_id,
-            "button_id": button_id,
-            "business_data": business_data
-        }
-        
-        success = publish_flow_node_event(flow_payload)
-        if success:
-            logger.info(f"Published chatbot flow event for button click: {button_id} (conversation: {conversation_id})")
-            
-            chatbot_context_service.extend_context_ttl(conversation_id)
-        else:
-            logger.error(f"Failed to publish flow node event for button click {button_id} (conversation: {conversation_id})")
-            
-    except Exception as e:
-        logger.error(f"Error processing chatbot button click {button_id} for conversation {conversation_id}: {e}")
-        raise
-
-def _process_chatbot_list_selection(conversation_id: str, list_id: str, message_data: Dict[str, Any], logger):
-    _process_chatbot_button_click(conversation_id, list_id, message_data)
-
-def _handle_chatbot_interaction(message_data: Dict[str, Any], conversation_id: str, logger):
-    try:
-        chatbot_context_service = get_chatbot_context_service()
-        
-        interactive = message_data.get("content", {}).get("interactive", {})
-        interactive_type = interactive.get("type")
-        
-        logger.info(f"Processing chatbot interaction: {interactive_type} for conversation {conversation_id}")
-        
-        if interactive_type == "button_reply":
-            button_reply = interactive.get("button_reply", {})
-            button_id = button_reply.get("id")
-            
-            if button_id:
-                _process_chatbot_button_click(conversation_id, button_id, message_data, logger)
-            else:
-                logger.warning(f"Button reply missing button_id for conversation {conversation_id}")
-        
-        elif interactive_type == "list_reply":
-            list_reply = interactive.get("list_reply", {})
-            list_id = list_reply.get("id")
-            
-            if list_id:
-                _process_chatbot_list_selection(conversation_id, list_id, message_data, logger)
-            else:
-                logger.warning(f"List reply missing list_id for conversation {conversation_id}")
-        
-        else:
-            logger.warning(f"Unknown interactive type: {interactive_type} for conversation {conversation_id}")
-            
-    except Exception as e:
-        logger.error(f"Error handling chatbot interaction for conversation {conversation_id}: {e}")
-        raise
-
 def _handle_text_response_to_chatbot(message_data: Dict[str, Any], conversation_id: str, logger):
     try:
         chatbot_context_service = get_chatbot_context_service()
@@ -193,10 +117,7 @@ def process_received_message_task(self, message_body: dict[str, Any],conversatio
         
         self.logger.info(f"Processing message type: {message_type} for conversation: {conversation_id}")
         
-        if message_type == "interactive":
-            _handle_chatbot_interaction(message_body, conversation_id,self.logger)
-            
-        elif message_type == "text":
+        if message_type == "text":
             _handle_text_response_to_chatbot(message_body, conversation_id,self.logger)
             
         else:

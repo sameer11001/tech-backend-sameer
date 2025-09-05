@@ -1,7 +1,10 @@
-from datetime import datetime, timedelta, timezone
 import io
+from uuid import UUID
+from app.utils.Helper import Helper
 from typing import Any, Dict, List, Optional
+from datetime import datetime, timedelta, timezone
 from app.annotations.services.ContactService import ContactService
+from app.chat_bot.models.ChatBot import FlowNode
 from app.chat_bot.services.ChatbotContextService import ChatbotContextService
 from app.events.pub.ChatbotFlowPublisher import ChatbotFlowPublisher
 from app.events.pub.MessageReceivedPublisher import MessageHookReceivedPublisher
@@ -14,10 +17,7 @@ from app.user_management.user.models.Team import Team
 from app.user_management.user.services.ClientService import ClientService
 from app.user_management.user.services.TeamService import TeamService
 from app.utils.RedisHelper import RedisHelper
-from app.whatsapp.business_profile.v1.models.BusinessProfile import BusinessProfile
 from app.whatsapp.business_profile.v1.services.BusinessProfileService import BusinessProfileService
-from app.utils.Helper import Helper
-from app.whatsapp.team_inbox.models.Assignment import Assignment
 from app.whatsapp.team_inbox.models.schema.response.ConversationWithContact import ConversationWithContact
 from app.whatsapp.team_inbox.models.Conversation import Conversation
 from app.whatsapp.team_inbox.models.ConversationTeamLink import ConversationTeamLink
@@ -49,6 +49,7 @@ class MessageHook:
         redis_service: AsyncRedisService,
         socket_message: SocketMessageGateway,
         mongo_message: MongoCRUD[Message],
+        mongo_flow: MongoCRUD[FlowNode],
         s3_service: S3Service,
         message_hook_received_publisher: MessageHookReceivedPublisher,
         aws_s3_bucket: str,
@@ -67,6 +68,7 @@ class MessageHook:
         self.redis_service = redis_service
         self.socket_message = socket_message
         self.mongo_message = mongo_message
+        self.mongo_flow = mongo_flow
         self.s3_service = s3_service
         self.message_hook_received_publisher = message_hook_received_publisher
         self.aws_s3_bucket = aws_s3_bucket
@@ -133,14 +135,16 @@ class MessageHook:
             
             msg_type = msg.get("type")
             
-            # await self.message_hook_received_publisher.publish_message(
-            #     message_body=data, conversation_id=str(conversation.id)
-            # )
+            await self.message_hook_received_publisher.publish_message(
+                message_body=data, conversation_id=str(conversation.id)
+            )
             
             await logger.adebug("Message data processed", message_type=msg_type)
             await self.socket_message.emit_received_message(
                 message=data, phone_number_id=phone_id, conversation_id=str(conversation.id)
             )
+            await logger.adebug(f"Message sent to socket {data}", message_type=msg_type)
+            
             await self._set_conversation_expiration(conversation.id, logger)
             
             await self._handle_chatbot_interaction(msg, conversation, logger)
@@ -199,63 +203,113 @@ class MessageHook:
             await logger.aexception("Error handling text response to chatbot", error=str(e))
 
     async def _process_chatbot_button_click(self, conversation: Conversation, button_id: str, 
-                                          msg: Dict[str, Any], logger):
-        try:
-            chatbot_context = await self.chatbot_context_service.get_chatbot_context(str(conversation.id))
-            
-            if not chatbot_context:
-                await logger.adebug("No active chatbot context for conversation")
-                return
+                                            msg: Dict[str, Any], logger):
+        if conversation.chatbot_triggered:
+            try:
                 
-            current_node_id = chatbot_context.get("current_node_id")
-            chatbot_id = chatbot_context.get("chatbot_id")
-            
-            if not current_node_id or not chatbot_id:
-                await logger.adebug("Invalid chatbot context for conversation")
-                return
-            
-            business_data = await self._get_business_data_for_conversation(conversation, msg, logger)
-            
-            flow_payload = {
-                "conversation_id": str(conversation.id),
-                "current_node_id": current_node_id,
-                "button_id": button_id,
-                "business_data": business_data
-            }
-            
-            await self.chatbot_flow_publisher.publish_flow_node_event(flow_payload)
-            
-            await self.chatbot_context_service.extend_context_ttl(str(conversation.id))
-            
-            await logger.adebug("Published chatbot flow event for button click", button_id=button_id)
-            
-        except Exception as e:
-            await logger.aexception("Error processing chatbot button click", error=str(e), button_id=button_id)
-
+                chatbot_context = await self.chatbot_context_service.get_chatbot_context(str(conversation.id))
+                
+                chat_bot_id = conversation.chatbot_id
+                
+                if not chatbot_context:
+                    first_node : FlowNode = await self.mongo_flow.find_one(query= {
+                        "chat_bot_id": chat_bot_id,
+                        "is_first": True
+                    })
+                    await self.chatbot_context_service.set_chatbot_context(
+                        conversation_id = str(conversation.id), 
+                        chatbot_id = chat_bot_id,
+                        current_node_id = first_node.id
+                        
+                    )
+                    chatbot_context = {
+                        "current_node_id": first_node.id,
+                        "chatbot_id": chat_bot_id
+                    }
+                    
+                current_node_id = chatbot_context.get("current_node_id")
+                chatbot_id = chatbot_context.get("chatbot_id")
+                
+                if not current_node_id or not chatbot_id:
+                    await logger.adebug("Invalid chatbot context for conversation")
+                    return
+                
+                flow_node_by_button_id: FlowNode = await self.mongo_flow.find_one({
+                    "chat_bot_id": UUID(chatbot_id) if isinstance(chatbot_id, str) else chatbot_id,
+                    "type": "interactive_buttons", 
+                    "buttons.id": button_id, 
+                })
+                
+                if not flow_node_by_button_id:
+                    await logger.adebug("Flow node not found for button click", 
+                                        button_id=button_id, 
+                                        chatbot_id=str(chatbot_id))
+                    return
+                    
+                business_data = await self._get_business_data_for_conversation(conversation, msg, logger)
+                
+                flow_payload = {
+                    "conversation_id": str(conversation.id),
+                    "current_node_id": flow_node_by_button_id.id,
+                    "button_id": button_id,
+                    "business_data": business_data
+                }
+                
+                await self.chatbot_flow_publisher.flow_node_event(flow_payload)
+                
+                await self.chatbot_context_service.extend_context_ttl(str(conversation.id))
+                
+                await logger.adebug("Published chatbot flow event for button click", button_id=button_id)
+                
+            except Exception as e:
+                await logger.aexception("Error processing chatbot button click", error=str(e), button_id=button_id)
+                
     async def _process_chatbot_list_selection(self, conversation: Conversation, list_id: str, 
                                             msg: Dict[str, Any], logger):
         await self._process_chatbot_button_click(conversation, list_id, msg, logger)
 
     async def _get_business_data_for_conversation(self, conversation: Conversation, msg: Dict[str, Any], 
-                                                logger) -> Dict[str, Any]:
+                                                    logger) -> Dict[str, Any]:
         try:
             metadata = msg.get("metadata", {})
             phone_id = metadata.get("phone_number_id")
             
+            business_token = None
+            
             if phone_id:
-                profile: BusinessProfile = await self.business_profile_service.get_by_phone_number_id(str(phone_id))
-                business_token = profile.access_token
-            else:
-                client = await self.client_service.get_by_id(conversation.client_id)
-                business_token = getattr(client, 'business_token', None)
-                phone_id = getattr(client, 'phone_number_id', None)
+                try:
+                    profile = await self.business_profile_service.get_by_phone_number_id(str(phone_id))
+                    business_token = profile.access_token
+                    await logger.adebug("Got business data from metadata", phone_id=phone_id)
+                except Exception as e:
+                    await logger.awarning(f"Failed to get profile from phone_id: {e}")
+                    phone_id = None  
+            
+            if not business_token or not phone_id:
+                client = await self.client_service.get(conversation.client_id)
+                
+                profile = await self.business_profile_service.get_by_client_id(str(client.id))
+                
+                if profile:
+                    business_token = profile.access_token
+                    phone_id = profile.phone_number_id
+                    await logger.adebug("Got business data from client profile", client_id=str(client.id))
+                else:
+                    await logger.aerror("No business profile found for client", client_id=str(client.id))
+                    raise ValueError(f"No business profile found for client {client.id}")
+            
+            recipient_number = msg.get("from")
+            if not recipient_number:
+                contact = await self.contact_service.get(conversation.contact_id)
+                recipient_number = f"{contact.country_code}{contact.phone_number}"
             
             return {
                 "business_token": business_token,
                 "business_phone_number_id": phone_id,
-                "recipient_number": msg["from"],
+                "recipient_number": recipient_number,
                 "contact_id": str(conversation.contact_id),
-                "client_id": str(conversation.client_id)
+                "client_id": str(conversation.client_id),
+                "chatbot_id": str(conversation.chatbot_id) if hasattr(conversation, 'chatbot_id') else None
             }
             
         except Exception as e:

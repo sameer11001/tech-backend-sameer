@@ -139,7 +139,7 @@ class TextMessage:
         )  
         if not conversation:
             raise EntityNotFoundException("Conversation not found") 
-        await self.conversation_service.update(conversation.id, {"chatbot_triggered": False})
+        await self.conversation_service.update(id=conversation.id,data= {"chatbot_triggered": False})
         
         return conversation 
     

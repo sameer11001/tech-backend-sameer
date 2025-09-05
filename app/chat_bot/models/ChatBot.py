@@ -46,7 +46,8 @@ class FlowNode(Document, BaseModelNoNone):
     class Settings:
         name = "chatbot_flow_nodes"
         indexes = indexes = [
-        [("chat_bot_id", 1), ("is_first", 1)]
+        [("chat_bot_id", 1), ("is_first", 1)],
+        [("chat_bot_id", 1),("type", 1), ("buttons.id", 1)],
     ]
     class Config:
         arbitrary_types_allowed = True
