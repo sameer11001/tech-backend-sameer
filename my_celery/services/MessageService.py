@@ -313,37 +313,57 @@ def _handle_interactive_buttons_node(message_node: FlowNode, business_data: dict
     if not whatsapp_interactive:
         raise ValueError("Interactive node has no 'whatsapp_interactive' payload")
 
-    messages = send_interactive_message(
-        business_data["business_token"],
-        business_data["business_phone_number_id"],
-        business_data["recipient_number"],
-        whatsapp_interactive
-    )["messages"]
+    try:
+        messages = send_interactive_message(
+            business_data["business_token"],
+            business_data["business_phone_number_id"],
+            business_data["recipient_number"],
+            whatsapp_interactive
+        )["messages"]
+    except Exception as e:
+        raise RuntimeError(f"Failed to send interactive message: {e}") from e
 
     message_docs = []
     for wa_msg in messages:
-        sql_id, message_doc =_persist_outgoing_message(
+        sql_id, message_doc = _persist_outgoing_message(
             conversation_id,
             business_data,
             message_type="interactive",
             whatsapp_response_msg=wa_msg,
-            message_body=body  
+            message_body=body,
+            current_node_id=message_node.id,
+            is_final_node=message_node.is_final
         )
         message_docs.append(message_doc)
 
     node_buttons = getattr(message_node, "buttons", []) or []
     for btn in node_buttons:
-        chatbot_context_service.store_next_node_for_button(
-            chatbot_id=business_data["chatbot_id"],
-            previous_node_id="",
-            current_node_id=message_node.id,
-            button_id=btn.id,
-            next_node_id=btn.next_node_id
+        try:
+            chatbot_context_service.store_next_node_for_button(
+                chatbot_id=business_data["chatbot_id"],
+                current_node_id=message_node.id,
+                button_id=btn.id,
+                next_node_id=btn.next_node_id
+            )
+            logger.debug(f"Stored button mapping: {btn.id} -> {btn.next_node_id}")
+        except Exception as e:
+            logger.warning(f"Failed to store button mapping: {e}")
+    
+    try:
+        chatbot_context_service.update_current_node(
+            conversation_id=conversation_id,
+            new_current_node_id=message_node.id,
+            node_type="interactive_buttons",
+            waiting_for_response=True
         )
+        logger.debug(f"Set waiting for button selection on node {message_node.id}")
+    except Exception as e:
+        logger.warning(f"Failed to update context for interactive node: {e}")
+    
     logger.debug(
-        "node_buttons",
+        "interactive_buttons_node_processed",
         node_id=message_node.id,
-        buttons=node_buttons
+        button_count=len(node_buttons)
     )
     return message_docs
 
@@ -352,6 +372,8 @@ def _handle_question_node(message_node: FlowNode, business_data: dict, conversat
     question_text = body.get("question_text")
     if not question_text:
         raise ValueError("Question node missing 'question_text'")
+    
+    chatbot_context_service = get_chatbot_context_service()
     try:
         messages = send_text_message(
             business_data["business_token"],
@@ -360,8 +382,20 @@ def _handle_question_node(message_node: FlowNode, business_data: dict, conversat
             business_data["recipient_number"],
             preview_url=False
         )["messages"]
+        
+        
+        try:
+            chatbot_context_service.set_waiting_for_response(
+                conversation_id=conversation_id,
+                node_id=message_node.id,
+                node_type="question"
+            )
+            logger.info(f"Set waiting for response state for question node {message_node.id}")
+        except Exception as e:
+            logger.warning(f"Failed to set waiting for response state: {e}")
+        
     except Exception as e:
-        raise RuntimeError(f"Failed to send text message: {e}") from e
+        raise RuntimeError(f"Failed to send question message: {e}") from e
     
     message_docs = []
     for wa_msg in messages:
@@ -370,9 +404,12 @@ def _handle_question_node(message_node: FlowNode, business_data: dict, conversat
             business_data,
             message_type="question",
             whatsapp_response_msg=wa_msg,
-            message_body=body
+            message_body=body,
+            current_node_id=message_node.id,
+            is_final_node=message_node.is_final
         )
         message_docs.append(message_doc)
+    
     return message_docs
 
 def _handle_operation_node(message_node: FlowNode, business_data: dict, conversation_id: str):

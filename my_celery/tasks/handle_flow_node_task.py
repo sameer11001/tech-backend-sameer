@@ -41,7 +41,7 @@ def conversation_end_triggered(conversation_id: str):
     except Exception as e:
         logger.error(f"Failed to clear conversation context: {e}")
 
-def get_next_node(current_node_id: str, button_id: Optional[str] = None, user_response: Optional[str] = None) -> Optional[FlowNode]:
+def get_next_node(current_node_id: str,conversation_id: str, button_id: Optional[str] = None, user_response: Optional[str] = None) -> Optional[FlowNode]:
     
     try:
         chatbot_context_service : ChatbotContextService = get_chatbot_context_service()
@@ -78,6 +78,16 @@ def get_next_node(current_node_id: str, button_id: Optional[str] = None, user_re
                 if button.id == button_id:
                     next_node_id = button.next_node_id
                     logger.info(f"Found button {button_id} -> next_node: {next_node_id}")
+                    
+                    try:
+                        chatbot_context_service.store_next_node_for_button(
+                            chatbot_id=current_node.chat_bot_id,
+                            current_node_id=current_node_id,
+                            button_id=button_id,
+                            next_node_id=next_node_id
+                        )
+                    except Exception as e:
+                        logger.warning(f"Failed to cache button mapping: {e}")
                     break
 
             if not next_node_id:
@@ -90,7 +100,7 @@ def get_next_node(current_node_id: str, button_id: Optional[str] = None, user_re
             try:
                 question_text = current_node.body.get("question_text", "") if current_node.body else ""
                 chatbot_context_service.store_contact_response(
-                    conversation_id="",  
+                    conversation_id=conversation_id,  
                     node_id=current_node_id,
                     question=question_text,
                     response=user_response
@@ -178,8 +188,15 @@ def handle_flow_node_task(self, data):
                     f"current_node={current_node_id}, button_id={button_id}, "
                     f"user_response={user_response is not None}")
                 
-        next_node = get_next_node(current_node_id, button_id, user_response)
-        
+        if user_response or button_id:
+            try:
+                chatbot_context_service.clear_waiting_for_response(conversation_id)
+                self.logger.info(f"Cleared waiting for response state for conversation {conversation_id}")
+            except Exception as e:
+                self.logger.warning(f"Failed to clear waiting for response state: {e}")
+                
+        next_node = get_next_node(current_node_id=current_node_id, conversation_id=conversation_id,button_id= button_id,user_response= user_response)
+
         if next_node is None:
             self.logger.info(f"No next node found, ending flow. conversation={conversation_id}, "
                         f"current_node={current_node_id}, button_id={button_id}")
@@ -190,28 +207,44 @@ def handle_flow_node_task(self, data):
         self.logger.info(f"Found next node: {next_node.id} (type: {next_node.type.value})")
         
         try:
+            waiting_for_response = next_node.type.value in ["question", "interactive_buttons"]
             
             chatbot_context_service.update_current_node(
                 conversation_id=conversation_id,
                 new_current_node_id=next_node.id,
                 previous_node_id=current_node_id,
-                chatbot_id = business_data["chatbot_id"]
+                chatbot_id=business_data["chatbot_id"],
+                node_type=next_node.type.value,
+                waiting_for_response=waiting_for_response
             )
-            self.logger.info(f"Updated chatbot context: {current_node_id} -> {next_node.id}")
+            self.logger.info(f"Updated chatbot context: {current_node_id} -> {next_node.id} (waiting: {waiting_for_response})")
+            
         except Exception as e:
             self.logger.warning(f"Failed to update chatbot context: {e}")
         
         if button_id:
             try:
+                selection_data = {"button_id": button_id, "next_node_id": next_node.id}
                 chatbot_context_service.store_contact_selection(
                     conversation_id=conversation_id,
                     node_id=current_node_id,
                     selection_type="button",
-                    selection_data={"button_id": button_id, "next_node_id": next_node.id}
+                    selection_data=selection_data
                 )
             except Exception as e:
                 self.logger.warning(f"Failed to store user selection: {e}")
-        
+
+        if user_response:
+            try:
+                chatbot_context_service.store_contact_response(
+                    conversation_id=conversation_id,
+                    node_id=current_node_id,
+                    question="question",  
+                    response=user_response
+                )
+            except Exception as e:
+                self.logger.warning(f"Failed to store user response: {e}")
+
         try:
             message_docs = message_node_handler(
                 message_node=next_node,
@@ -245,7 +278,10 @@ def handle_flow_node_task(self, data):
                 )
                 handle_flow_completion(conversation_id, next_node.id, business_data)
                 
-            self.logger.info(f"Flow paused at node {next_node.id} (type: {next_node.type.value}, final: {next_node.is_final})")
+            elif next_node.type.value in ["question", "interactive_buttons"]:
+                self.logger.info(f"Flow paused at {next_node.type.value} node {next_node.id}, waiting for user response")
+            else:
+                self.logger.info(f"Flow paused at node {next_node.id} (type: {next_node.type.value})")
         
         return {
             "status": "success",

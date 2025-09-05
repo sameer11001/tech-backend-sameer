@@ -133,22 +133,24 @@ class MessageHook:
                 msg["from"], f'+{display_number}', contact_info, profile.id, logger
             )
             
+            await self.socket_message.emit_received_message(
+                message=data, phone_number_id=phone_id, conversation_id=str(conversation.id)
+            )
+            
             msg_type = msg.get("type")
             
             await self.message_hook_received_publisher.publish_message(
                 message_body=data, conversation_id=str(conversation.id)
             )
-            
+            if msg_type == "interactive":
+                await self._handle_chatbot_interaction(msg, conversation, logger)
+                
             await logger.adebug("Message data processed", message_type=msg_type)
-            await self.socket_message.emit_received_message(
-                message=data, phone_number_id=phone_id, conversation_id=str(conversation.id)
-            )
+
             await logger.adebug(f"Message sent to socket {data}", message_type=msg_type)
             
             await self._set_conversation_expiration(conversation.id, logger)
-            
-            await self._handle_chatbot_interaction(msg, conversation, logger)
-            
+                        
             await self.save_message.process_message(
                 message_data=data, conversation_id=conversation.id, contact_id=conversation.contact_id
             )
