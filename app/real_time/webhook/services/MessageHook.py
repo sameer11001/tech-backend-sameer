@@ -1,5 +1,10 @@
 import io
+import json
 from uuid import UUID
+from app.chat_bot.models.ChatBotMeta import ChatBotMeta
+from app.chat_bot.services.ChatBotService import ChatBotService
+from app.events.pub.ChatBotTriggerPublisher import ChatBotTriggerPublisher
+from app.user_management.user.models.Client import Client
 from app.utils.Helper import Helper
 from typing import Any, Dict, List, Optional
 from datetime import datetime, timedelta, timezone
@@ -17,6 +22,7 @@ from app.user_management.user.models.Team import Team
 from app.user_management.user.services.ClientService import ClientService
 from app.user_management.user.services.TeamService import TeamService
 from app.utils.RedisHelper import RedisHelper
+from app.whatsapp.business_profile.v1.models.BusinessProfile import BusinessProfile
 from app.whatsapp.business_profile.v1.services.BusinessProfileService import BusinessProfileService
 from app.whatsapp.team_inbox.models.schema.response.ConversationWithContact import ConversationWithContact
 from app.whatsapp.team_inbox.models.Conversation import Conversation
@@ -42,9 +48,11 @@ class MessageHook:
         assignment_service: AssignmentService,
         team_service: TeamService,
         business_profile_service: BusinessProfileService,
+        chatbot_service: ChatBotService,
         message_publisher: WhatsappMessagePublisher,
         chatbot_context_service: ChatbotContextService,
         chatbot_flow_publisher: ChatbotFlowPublisher,
+        chatbot_trigger_publisher: ChatBotTriggerPublisher,
         media_api: WhatsAppMediaApi,
         redis_service: AsyncRedisService,
         socket_message: SocketMessageGateway,
@@ -63,7 +71,9 @@ class MessageHook:
         self.assignment_service = assignment_service
         self.team_service = team_service
         self.business_profile_service = business_profile_service
+        self.chatbot_service = chatbot_service
         self.message_publisher = message_publisher
+        self.chatbot_trigger_publisher = chatbot_trigger_publisher
         self.media_api = media_api
         self.redis_service = redis_service
         self.socket_message = socket_message
@@ -114,7 +124,7 @@ class MessageHook:
         
         logger = self._get_logger(phone_id=phone_id, operation='handle_received_messages')
         
-        profile = await self.business_profile_service.get_by_phone_number_id(str(phone_id))
+        profile : BusinessProfile = await self.business_profile_service.get_by_phone_number_id(str(phone_id))
         access_token = profile.access_token
         contact_info = self._extract_contact_info(payload.get("contacts", []))
 
@@ -130,21 +140,22 @@ class MessageHook:
             await self._handle_context(data, msg, logger)
             
             conversation: Conversation = await self.get_or_create_conversation(
-                msg["from"], f'+{display_number}', contact_info, profile.id, logger
-            )
-            
-            await self.socket_message.emit_received_message(
-                message=data, phone_number_id=phone_id, conversation_id=str(conversation.id)
+                msg["from"], f'+{display_number}', contact_info, profile, logger
             )
             
             msg_type = msg.get("type")
             
             await self.message_hook_received_publisher.publish_message(
-                message_body=data, conversation_id=str(conversation.id)
+                message_body=data, conversation_id=str(conversation.id),recipient_number=f'+{display_number}'
             )
             if msg_type == "interactive":
                 await self._handle_chatbot_interaction(msg, conversation, logger)
-                
+                data["type"] = "button_interactive"
+
+            await self.socket_message.emit_received_message(
+                message=data, phone_number_id=phone_id, conversation_id=str(conversation.id)
+            )
+
             await logger.adebug("Message data processed", message_type=msg_type)
 
             await logger.adebug(f"Message sent to socket {data}", message_type=msg_type)
@@ -426,26 +437,78 @@ class MessageHook:
             await logger.aexception("Error handling context", error=str(e))
             data["context"] = None
 
+    async def _should_trigger_chatbot(self, from_number: str, client_number: str, logger) -> bool:
+        try:
+            contact = await self.contact_service.get_by_business_profile_and_contact_number(
+                client_number, from_number
+            )
+            
+            if contact is None:
+                await logger.adebug("New contact - triggering chatbot")
+                return True
+            
+            conversation = await self.conversation_service.find_by_contact_and_client_number(
+                contact_phone_number=from_number, 
+                client_phone_number=client_number
+            )
+            
+            if conversation is None:
+                await logger.adebug("No conversation for existing contact - triggering chatbot")
+                return True
+            
+            expiration_key = RedisHelper.redis_conversation_expired_key(conversation.id)
+            is_active = await self.redis_service.exists(expiration_key)
+            
+            if not is_active:
+                await logger.adebug("Conversation expired - triggering chatbot")
+                return True
+            
+            await logger.adebug("Active conversation exists - no chatbot trigger needed")
+            return False
+            
+        except Exception as e:
+            await logger.aexception("Error checking chatbot trigger", error=str(e))
+            return False
+
+
     async def get_or_create_conversation(self, from_number: str, client_number: str, 
-                                       contact_info: Dict[str, Any], business_profile_id: str, 
-                                       logger) -> Conversation:
+                                        contact_info: Dict[str, Any], business_profile: BusinessProfile, 
+                                        logger) -> Conversation:
+        
+        should_trigger = await self._should_trigger_chatbot(from_number, client_number, logger)
         
         convo: Conversation = await self.conversation_service.find_by_contact_and_client_number(
             contact_phone_number=from_number, client_phone_number=client_number,
         )
+        
+        client : Client = await self.client_service.get_by_business_profile_number(client_number)
+        default_chatbot : ChatBotMeta = await self.chatbot_service.get_default_by_client_id(client.id)
+        
         if convo:
             if not convo.is_open:
                 convo.is_open = True
                 convo = await self.conversation_service.update(convo.id, {"is_open": True})
                 await logger.adebug("Reopened existing conversation", conversation_id=str(convo.id))
+            
+            if should_trigger:
+                await self.chatbot_trigger_publisher.trigger_chatbot_event({
+                    "conversation_id": str(convo.id),
+                    "chatbot_id": str(default_chatbot.id),
+                    "business_token": business_profile.access_token,
+                    "business_phone_number_id": business_profile.phone_number_id,
+                    "recipient_number": f"+{from_number}"
+                })
+                
+                await logger.adebug("Triggered chatbot for existing conversation")
+                await self.socket_message.emit_chatbot_triggered_status(conversation_id=str(convo.id), business_profile_id=str(business_profile.id), chatbot_triggered=True)
+            
             return convo
-
-        client = await self.client_service.get_by_business_profile_number(client_number)
+            
         contact = await self.contact_service.get_by_business_profile_and_contact_number(client_number, from_number)
         country, national = Helper.number_parsed(from_number)
         
         await logger.adebug("Creating new conversation", country=country, national=national, contact_exists=bool(contact))
-
+    
         if contact is None:
             contact = await self.contact_service.create(
                 Contact(
@@ -460,19 +523,20 @@ class MessageHook:
             await logger.adebug("Created new contact", contact_id=str(contact.id))
         
         default_team: Team = await self.team_service.get_default_team_by_client_id(client.id)
-
+    
         conversation: Conversation = Conversation(
             contact_id=contact.id,
             client_id=client.id,
             status=ConversationStatus.OPEN,
             is_open=True,
-            chatbot_triggered=True
+            chatbot_triggered=True  
         )
         conversation_team_link = ConversationTeamLink(
             conversation=conversation, team=default_team
         )
         conversation.teams.append(conversation_team_link)
         conversation_created = await self.conversation_service.create(conversation)
+        
         conversation_body = ConversationWithContact(
             id=str(conversation_created.id),
             contact_id=str(contact.id),
@@ -488,10 +552,14 @@ class MessageHook:
             last_message="",
             last_message_time=datetime.now(timezone.utc).isoformat()
         )
+        conversation_data = json.loads(conversation_body.model_dump_json())
+        await self.socket_message.emit_create_new_conversation(conversation_data, business_profile_id)
         
-        await self.socket_message.emit_create_new_conversation(conversation_body.model_dump(), business_profile_id)
-        
-        await logger.adebug("Created new conversation", conversation_id=str(conversation_created.id))
+        await self.chatbot_trigger_publisher.trigger_chatbot_event({
+            "conversation_id": str(conversation_created.id)
+        })
+        await logger.adebug("Created new conversation and triggered chatbot", conversation_id=str(conversation_created.id))
+        await self.socket_message.emit_chatbot_triggered_status(conversation_id=str(conversation_created.id), business_profile_id=business_profile_id, chatbot_triggered=True)
         return conversation_created
 
     async def _set_conversation_expiration(self, conversation_id: Any, logger) -> None:

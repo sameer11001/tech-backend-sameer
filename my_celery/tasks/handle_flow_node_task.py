@@ -9,7 +9,7 @@ from my_celery.models.ChatBot import FlowNode
 from my_celery.models.schemas.ChatbotReplyEventPayload import ChatbotReplyEventPayload
 from my_celery.tasks.base_task import BaseTask
 from my_celery.signals.lifecycle import get_chatbot_context_service, get_chatbot_crud
-from my_celery.services.MessageService import message_node_handler
+from my_celery.services.MessageService import _persist_outgoing_message, message_node_handler
 from my_celery.tasks.publishers.message_publisher import publish_chatbot_reply_event
 from my_celery.utils.DateTimeHelper import DateTimeHelper
 from my_celery.services.ChatbotContextService import ChatbotContextService
@@ -134,32 +134,51 @@ def get_next_node(current_node_id: str,conversation_id: str, button_id: Optional
 
 def handle_flow_completion(conversation_id: str, current_node_id: str, business_data: dict):
     try:
-        
         conversation_end_triggered(conversation_id=conversation_id)
 
-        completion_payload = ChatbotReplyEventPayload(
-            conversation_id=str(conversation_id),
-            chatbot_id=str(business_data["chatbot_id"]),
-            message_id="flow_completed",
-            message_type="flow_completion",
-            message_status="completed",
-            content={
-                "flow_status": "completed", 
-                "last_node_id": current_node_id,
-                "completed_at": DateTimeHelper.now_utc().isoformat()
-            },
-            is_from_contact=False,
-            member_id=str(business_data["chatbot_id"]),
-            created_at=DateTimeHelper.now_utc().isoformat(),
-            current_node_id=current_node_id,
-            is_final_node=True,
-            business_data=business_data,
-            event_type="flow_completion"
-        )
-        
-        publish_chatbot_reply_event(completion_payload.to_dict())
-        logger.info(f"Published flow completion event for conversation: {conversation_id}")
-        
+        completion_content = {
+            "flow_status": "completed", 
+            "last_node_id": current_node_id,
+            "completed_at": DateTimeHelper.now_utc().isoformat()
+        }
+
+        mock_wa_response = {
+            "id": f"completion_{conversation_id}_{current_node_id}_{int(DateTimeHelper.now_utc().timestamp())}"
+        }
+
+        try:
+            sql_id, message_doc = _persist_outgoing_message(
+                conversation_id=conversation_id,
+                business_data=business_data,
+                message_type="flow_completion",
+                whatsapp_response_msg=mock_wa_response,
+                message_body=completion_content,
+                current_node_id=current_node_id,
+                is_final_node=True
+            )
+            logger.info(f"Persisted flow completion message: {sql_id} for conversation: {conversation_id}")
+            
+        except Exception as e:
+            logger.error(f"Failed to persist flow completion message: {e}")
+            
+            completion_payload = ChatbotReplyEventPayload(
+                conversation_id=str(conversation_id),
+                chatbot_id=str(business_data["chatbot_id"]),
+                message_id="flow_completed",
+                message_type="flow_completion",
+                message_status="completed",
+                content=completion_content,
+                is_from_contact=False,
+                member_id=str(business_data["chatbot_id"]),
+                created_at=DateTimeHelper.now_utc().isoformat(),
+                current_node_id=current_node_id,
+                is_final_node=True,
+                business_data=business_data,
+                event_type="flow_completion"
+            )
+            
+            publish_chatbot_reply_event(completion_payload.to_dict())
+            logger.info(f"Published fallback flow completion event for conversation: {conversation_id}")
         
     except Exception as e:
         logger.error(f"Failed to handle flow completion: {e}")

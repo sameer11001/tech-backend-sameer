@@ -1,4 +1,3 @@
-from app.chat_bot.v1.use_case.TriggerChatBot import TriggerChatBot
 from app.core.config.container_imports import *
 
 class Container(containers.DeclarativeContainer):
@@ -309,9 +308,11 @@ class Container(containers.DeclarativeContainer):
         assignment_service = assignment_service,
         team_service = team_service, 
         business_profile_service = business_profile_service ,
+        chatbot_service = chat_bot_service,
         message_publisher = message_publisher, 
         chatbot_context_service = chat_bot_context_service, 
         chatbot_flow_publisher = chat_bot_flow_publisher, 
+        chatbot_trigger_publisher = chat_bot_trigger_publisher,
         media_api = whatsapp_media_api,
         redis_service = async_redis_service,
         mongo_message = mongo_crud_message,
@@ -330,7 +331,8 @@ class Container(containers.DeclarativeContainer):
     chat_bot_add_flow_node = providers.Factory(AddFlowNode, chat_bot_service = chat_bot_service, business_service = business_profile_service,whatsapp_media_api = whatsapp_media_api,s3_bucket_service = s3_bucket_service, aws_region = config.AWS_REGION, aws_s3_bucket_name = config.S3_BUCKET_NAME, mongo_crud_chat_bot = mongo_crud_chat_bot)
     chat_bot_get_chat_bots = providers.Factory(GetChatBots, chat_bot_service = chat_bot_service,user_service = user_service)
     chat_bot_get_flow_nodes = providers.Factory(GetChatBotFlow, chat_bot_service = chat_bot_service,mongo_crud_chat_bot_flow = mongo_crud_chat_bot)
-    chat_bot_trigger_chat_bot = providers.Factory(TriggerChatBot, chat_bot_service = chat_bot_service,conversation_service = conversation_service,trigger_publisher = chat_bot_trigger_publisher, business_service = business_profile_service,contact_service = contact_service)
+    chat_bot_trigger_chat_bot = providers.Factory(TriggerChatBot, chat_bot_service = chat_bot_service,conversation_service = conversation_service,trigger_publisher = chat_bot_trigger_publisher, business_service = business_profile_service,contact_service = contact_service, socket_message_gateway = socket_message_gateway)
+    chat_bot_make_chatbot_default = providers.Factory(MakeChatBotDefault, chat_bot_service = chat_bot_service)
     #----- error and logger -----
     error_handler = providers.Singleton(ErrorHandler, log_service = system_log_service)    
 

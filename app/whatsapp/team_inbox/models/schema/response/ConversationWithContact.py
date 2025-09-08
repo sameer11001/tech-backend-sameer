@@ -12,6 +12,7 @@ class ConversationWithContact(BaseModel):
     contact_id: UUID
     contact_name: Optional[str]
     contact_phone_number: str
+    chatbot_triggered : bool
     country_code_phone_number: str
     last_message: Optional[str]
     last_message_time: Optional[str]

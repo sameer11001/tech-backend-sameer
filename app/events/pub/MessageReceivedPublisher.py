@@ -40,11 +40,11 @@ class MessageHookReceivedPublisher:
             )
             await exchange.publish(msg, routing_key=routing_key)
     
-    async def publish_message(self, message_body: dict[str, Any],conversation_id: str = None):
+    async def publish_message(self, message_body: dict[str, Any],conversation_id: str = None, recipient_number: str = None):
         payload = {
             "id": str(uuid6.uuid7()),
             "task": "my_celery.tasks.process_received_message_task",
-            "args": [message_body,conversation_id],
+            "args": [message_body,conversation_id,recipient_number],
             "kwargs": {},
             "retries": 5,
             "eta": None

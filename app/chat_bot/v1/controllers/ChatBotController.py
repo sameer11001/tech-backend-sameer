@@ -13,6 +13,7 @@ from app.chat_bot.v1.use_case.AddFlowNode import AddFlowNode
 from app.chat_bot.v1.use_case.CreateChatBot import CreateChatBot
 from app.chat_bot.v1.use_case.GetChatBotFlow import GetChatBotFlow
 from app.chat_bot.v1.use_case.GetChatBots import GetChatBots
+from app.chat_bot.v1.use_case.MakeChatBotDefault import MakeChatBotDefault
 from app.chat_bot.v1.use_case.TriggerChatBot import TriggerChatBot
 from app.core.config.container import Container
 from app.core.exceptions.custom_exceptions.ClientExceptionHandler import ClientException
@@ -192,4 +193,28 @@ async def trigger_chat_bot(
     except Exception as e:
         raise ClientException(str(e))
 
-
+@router.post(
+    "/default",
+    responses={
+        **generate_responses(
+            [UnAuthorizedException, DataBaseException, ClientException]
+        )
+    },
+)
+@inject
+async def makes_chatbot_default(
+    chatbot_id: str = Query(None, description="chatbot_id to make default"),
+    make_chatbot_default: MakeChatBotDefault = Depends(Provide[Container.chat_bot_make_chatbot_default]),
+    token: dict = Depends(get_current_user),
+):
+    try:
+        response = await make_chatbot_default.execute(chatbot_id)
+        return response
+    except UnAuthorizedException as e:
+        raise e
+    except DataBaseException as e:
+        raise e
+    except ClientException as e:
+        raise e
+    except Exception as e:
+        raise ClientException(str(e))

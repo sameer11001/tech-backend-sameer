@@ -1,7 +1,7 @@
 from typing import Optional
 from uuid import UUID
 from sqlalchemy import desc, func, or_
-from sqlmodel import select
+from sqlmodel import asc, case, select
 from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.orm import selectinload
 from sqlmodel.ext.asyncio.session import AsyncSession
@@ -14,6 +14,7 @@ from app.whatsapp.business_profile.v1.models.BusinessProfile import BusinessProf
 from app.whatsapp.team_inbox.models.Conversation import Conversation
 from app.whatsapp.team_inbox.models.ConversationTeamLink import ConversationTeamLink
 from app.whatsapp.team_inbox.models.MessageMeta import MessageMeta
+from app.whatsapp.team_inbox.utils.conversation_status import ConversationStatus
 
 class ConversationRepository(BaseRepository[Conversation]):
     def __init__(self, session: AsyncSession):
@@ -53,7 +54,8 @@ class ConversationRepository(BaseRepository[Conversation]):
                 raise DataBaseException(str(e))
 
     async def get_user_conversations(
-        self, user_id: UUID, page: int = 1, limit: int = 10, search_term: Optional[str] = None
+        self, user_id: UUID, page: int = 1, limit: int = 10, search_term: Optional[str] = None, 
+        sort_by: Optional[str] = None, status_filter: Optional[str] = None
     ) -> dict:
         async with self.session as db_session:
             try:
@@ -77,11 +79,30 @@ class ConversationRepository(BaseRepository[Conversation]):
                     .where(UserTeam.user_id == user_id)
                     .options(selectinload(Conversation.conversation_link))
                     .options(selectinload(Conversation.assignment))
-                    .order_by(desc(subquery_latest_msg.c.latest_msg_time))
                 )
+
+                if status_filter:
+                    try:
+                        status_enum = ConversationStatus(status_filter.upper())
+                        query = query.where(Conversation.status == status_enum)
+                    except ValueError:
+                        pass
 
                 if search_term and search_term.strip():
                     query = query.where(self._build_search_conditions(search_term.strip()))
+
+                if sort_by == "status":
+                    status_order = case(
+                        (Conversation.status == ConversationStatus.OPEN, 1),
+                        (Conversation.status == ConversationStatus.PENDING, 2),
+                        (Conversation.status == ConversationStatus.SOLVED, 3),
+                        (Conversation.status == ConversationStatus.BROADCAST, 4),
+                        (Conversation.status == ConversationStatus.EXPIRED, 5),
+                        else_=6
+                    )
+                    query = query.order_by(asc(status_order), desc(subquery_latest_msg.c.latest_msg_time))
+                else:
+                    query = query.order_by(desc(subquery_latest_msg.c.latest_msg_time))
 
                 conversations_result = await db_session.exec(query.offset(offset).limit(limit))
                 conversations = conversations_result.all()
@@ -93,6 +114,14 @@ class ConversationRepository(BaseRepository[Conversation]):
                     .join(Contact, Conversation.contact_id == Contact.id)
                     .where(UserTeam.user_id == user_id)
                 )
+
+                if status_filter:
+                    try:
+                        status_enum = ConversationStatus(status_filter.upper())
+                        count_query = count_query.where(Conversation.status == status_enum)
+                    except ValueError:
+                        pass
+
                 if search_term and search_term.strip():
                     count_query = count_query.where(self._build_search_conditions(search_term.strip()))
 
@@ -110,6 +139,8 @@ class ConversationRepository(BaseRepository[Conversation]):
                         "has_prev": page > 1,
                         "next_page": page + 1 if page < total_pages else None,
                         "prev_page": page - 1 if page > 1 else None,
+                        "sort_by": sort_by,
+                        "status_filter": status_filter,
                     },
                 }
 

@@ -49,8 +49,7 @@ class Message(Document, BaseModelNoNone):
             ),
             IndexModel(
                 [("wa_message_id", ASCENDING)], 
-                unique=True, 
-                sparse=True  # Allows null values
+                sparse=True  
             )
         ]
 

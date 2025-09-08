@@ -605,6 +605,34 @@ class SocketMessageGateway:
                 await logger.aexception("Error emitting chatbot reply message", error=str(e))
         except Exception as e:
             await logger.aexception("Error emitting chatbot reply message", error=str(e))
+
+    async def emit_chatbot_triggered_status (self, conversation_id: str, business_profile_id: str,chatbot_triggered: bool):    
+
+        logger = self._get_logger(
+                "system",
+                component="chatbot_reply",
+                conversation_id=conversation_id
+        )
+        business_profile_phone_number_id = await self._get_business_profile_phone_number_id(business_profile_id)
+        
+        try:
+            
+            await self.sio.emit(
+                event="chatbot_triggered",
+                data={
+                    "conversation_id": str(conversation_id),
+                    "business_profile_id": str(business_profile_id),
+                    "chatbot_triggered": chatbot_triggered
+                },
+                room = business_profile_phone_number_id
+            )
+            
+            await logger.ainfo("Chatbot triggered message emitted successfully")
+            
+        except Exception as e:
+            await logger.aexception("Error emitting chatbot reply message", error=str(e))   
+
+
     async def emit_message_status(self, conversation_id: str, status: str, message_id: str):
         logger = self._get_logger("system", component="message_status",
                                 conversation_id=conversation_id,

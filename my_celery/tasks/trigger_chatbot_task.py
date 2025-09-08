@@ -42,12 +42,16 @@ def chatbot_process(self, chatbot_id)-> FlowNode:
     acks_late=False
 )
 def trigger_chatbot_task(self, data):
-    conversation_id = data["conversation_id"]
-    chatbot_id = data["chatbot_id"]
-    business_token = data["business_token"]
-    business_phone_number_id = data["business_phone_number_id"]
-    recipient_number = data["recipient_number"]
-    contact_id = data["contact_id"]
+    conversation_id = data.get("conversation_id")
+    if not conversation_id:
+        self.logger.error("No conversation_id provided")
+        return {"status": "failed", "reason": "missing_conversation_id"}
+    
+    chatbot_id = data.get("chatbot_id")
+    business_token = data.get("business_token")
+    business_phone_number_id = data.get("business_phone_number_id")
+    recipient_number = data.get("recipient_number")
+    contact_id = data.get("contact_id")
     
     business_data = {
         "business_token": business_token,

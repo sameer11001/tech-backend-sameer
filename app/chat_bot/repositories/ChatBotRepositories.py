@@ -1,5 +1,5 @@
 from typing import Optional
-from sqlmodel import func, select
+from sqlmodel import func, select, update
 from sqlmodel.ext.asyncio.session import AsyncSession
 from app.chat_bot.models.ChatBotMeta import ChatBotMeta
 from app.core.repository.BaseRepository import BaseRepository
@@ -48,4 +48,46 @@ class ChatBotRepository(BaseRepository[ChatBotMeta]):
                 result = await db_session.exec(query)
                 return result.one_or_none()
             except SQLAlchemyError as e:
+                raise DataBaseException(str(e))
+
+    async def get_default_by_client_id(self, client_id: str) -> ChatBotMeta:
+        async with self.session as db_session:
+            try:
+                query = select(ChatBotMeta).where(
+                    ChatBotMeta.is_default == True,
+                    ChatBotMeta.client_id == client_id
+                )
+                result = await db_session.exec(query)
+                return result.one_or_none()
+            except SQLAlchemyError as e:
+                raise DataBaseException(str(e))
+
+    async def make_chatbot_default(self, chat_bot_id: str):
+        async with self.session as db_session:
+            try:
+                query = select(ChatBotMeta).where(ChatBotMeta.id == chat_bot_id)
+                result = await db_session.exec(query)
+                chatbot = result.one_or_none()
+
+                if not chatbot:
+                    return None  
+
+
+                await db_session.exec(
+                    update(ChatBotMeta)
+                    .where(ChatBotMeta.client_id == chatbot.client_id)
+                    .where(ChatBotMeta.id != chat_bot_id)
+                    .values(is_default=False)
+                )
+                
+                chatbot.is_default = True
+                
+                db_session.add(chatbot)
+                await db_session.commit()
+                await db_session.refresh(chatbot)
+
+                return chatbot
+
+            except SQLAlchemyError as e:
+                await db_session.rollback()
                 raise DataBaseException(str(e))

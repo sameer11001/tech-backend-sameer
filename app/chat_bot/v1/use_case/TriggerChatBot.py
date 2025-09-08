@@ -6,6 +6,7 @@ from app.chat_bot.services.ChatBotService import ChatBotService
 from app.core.exceptions.GlobalException import GlobalException
 from app.core.schemas.BaseResponse import ApiResponse
 from app.events.pub.ChatBotTriggerPublisher import ChatBotTriggerPublisher
+from app.real_time.socketio.socket_gateway import SocketMessageGateway
 from app.whatsapp.business_profile.v1.models.BusinessProfile import BusinessProfile
 from app.whatsapp.business_profile.v1.services.BusinessProfileService import BusinessProfileService
 from app.whatsapp.team_inbox.models.Conversation import Conversation
@@ -18,13 +19,15 @@ class TriggerChatBot:
         conversation_service: ConversationService,
         trigger_publisher:ChatBotTriggerPublisher,
         business_service: BusinessProfileService,
-        contact_service : ContactService
+        contact_service : ContactService,
+        socket_message_gateway: SocketMessageGateway
         ):
         self.chat_bot_service = chat_bot_service
         self.conversation_service = conversation_service
         self.trigger_publisher = trigger_publisher
         self.business_service = business_service
         self.contact_service = contact_service
+        self.socket_message_gateway = socket_message_gateway
     
     async def execute(self,business_profile_id: str,request_body: TriggerChatBotRequest):
         try:
@@ -59,6 +62,8 @@ class TriggerChatBot:
                 chat_bot.id, 
                 {"triggered": current_triggered + 1}
             )
+            
+            await self.socket_message_gateway.emit_chatbot_triggered_status(conversation.id, business_profile.id, True)
             
             return ApiResponse(message="Chatbot triggered successfully", status_code=204)
         except Exception as e:

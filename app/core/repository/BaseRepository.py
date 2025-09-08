@@ -5,12 +5,13 @@ from uuid import UUID
 from app.core.exceptions.custom_exceptions.DataBaseException import DataBaseException
 from app.core.exceptions.custom_exceptions.EntityNotFoundException import EntityNotFoundException
 from sqlalchemy.exc import SQLAlchemyError
+from sqlmodel.ext.asyncio.session import AsyncSession
 
 T = TypeVar("T", bound=SQLModel)
 
 
 class BaseRepository(Generic[T]):
-    def __init__(self, model: Type[T], session):
+    def __init__(self, model: Type[T], session : AsyncSession):
         self.model = model
         self.session = session
 
@@ -33,10 +34,10 @@ class BaseRepository(Generic[T]):
     async def create(self, obj: T, commit: bool = True) -> T:
         async with self.session as db_session:
             try:
-                db_session.add(obj)
+                merged_obj = await db_session.merge(obj)
                 if commit:
                     await db_session.commit()
-                    await db_session.refresh(obj)
+                    await db_session.refresh(merged_obj)
                 return obj
             except SQLAlchemyError as e:
                 raise DataBaseException(str(e))

@@ -60,7 +60,6 @@ class AssignedUserToConversation:
 
         message_meta_data = MessageMeta(
             message_type="assign",
-            whatsapp_message_id=" ",
             conversation_id=conversation.id,
             is_from_contact=False,
         )
@@ -70,7 +69,6 @@ class AssignedUserToConversation:
         message_document = Message(
             id=message_meta.id,
             message_type="assign",
-            wa_message_id=" ",
             content={"message": f"Chat is now assigned to {assigned_to_user.email} by {user.email}"},
             user_id=user.id,
             conversation_id=conversation.id,

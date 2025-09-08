@@ -25,3 +25,9 @@ class ChatBotService(BaseService[ChatBotMeta]):
             result = await self.repository.get_by_name(name,client_id)
             if result is not None:
                 raise ConflictException("ChatBot already exists")
+    
+    async def get_default_by_client_id(self, client_id: str) -> ChatBotMeta:
+        return await self.repository.get_default_by_client_id(client_id)
+    
+    async def make_chatbot_default(self, chat_bot_id: str):
+        return await self.repository.make_chatbot_default(chat_bot_id)

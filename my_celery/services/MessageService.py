@@ -60,6 +60,15 @@ def _build_message_content(message_type: str, message_body: Dict[str, Any], what
                     "wa_msg": whatsapp_response_msg
                 }
             }
+        elif message_type == "flow_completion":
+            content = {
+                "flow_status": message_body.get("flow_status"),
+                "last_node_id": message_body.get("last_node_id"),
+                "completed_at": message_body.get("completed_at"),
+                "meta": {
+                    "wa_msg": whatsapp_response_msg
+                }
+            }
         else:
             logger.warning(
                 "unknown_message_message_type_fallback",

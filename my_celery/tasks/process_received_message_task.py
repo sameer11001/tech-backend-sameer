@@ -1,4 +1,4 @@
-from typing import Any, Dict
+from typing import Any, Dict, Optional
 
 from sqlalchemy import text
 from my_celery.celery_app import celery_app
@@ -58,6 +58,211 @@ def _get_business_data_for_conversation(conversation_id: str, message_data: Dict
     except Exception as e:
         logger.error(f"Error getting business data for conversation {conversation_id}: {e}")
         raise
+
+def _get_conversation(conversation_id: str, logger) -> Dict[str, Any]:
+    try:
+
+        with get_db() as session:
+            stmt = text("""
+                SELECT *
+                FROM conversations c
+                WHERE c.id = :conversation_id
+            """)
+            
+            result = session.execute(stmt, {"conversation_id": conversation_id})
+            row = result.fetchone()
+            
+            if not row:
+                raise ValueError(f"Conversation not found: {conversation_id}")
+            
+            result_data = {
+                "status": row.status,
+                "is_open": row.is_open,
+                "contact_id": row.contact_id,
+                "chatbot_triggered": row.chatbot_triggered,
+                "chatbot_id": row.chatbot_id,
+                "client_id": str(row.client_id),
+            }                
+            return result_data
+    except Exception as e:
+        logger.error(f"Error getting business data for conversation {conversation_id}: {e}")
+        raise
+
+def _mark_conversation_chatbot_triggered(conversation_id: str, chatbot_id: str, logger) -> None:
+    try:
+        with get_db() as session:
+            stmt = text("""
+                UPDATE conversations 
+                SET chatbot_triggered = true, chatbot_id = :chatbot_id
+                WHERE id = :conversation_id
+            """)
+            
+            session.execute(stmt, {
+                "conversation_id": conversation_id,
+                "chatbot_id": chatbot_id
+            })
+            session.commit()
+            
+            logger.debug(f"Marked conversation {conversation_id} as chatbot triggered with chatbot {chatbot_id}")
+            
+    except Exception as e:
+        logger.error(f"Failed to mark conversation {conversation_id} as chatbot triggered: {e}")
+        raise
+
+def check_conversation_expiration(conversation_id: str, logger) -> bool:
+
+    try:
+        redis = get_redis_service()
+        expiration_key = RedisHelper.redis_conversation_expired_key(conversation_id)
+        
+        if redis.exists(expiration_key):
+            logger.debug(f"Conversation {conversation_id} is active (Redis key exists)")
+            return False
+
+        logger.debug(f"No Redis expiration key found for conversation {conversation_id}, checking database")
+        conversation = _get_conversation(conversation_id, logger)
+        
+        if not conversation.get("is_open", False):
+            logger.info(f"Conversation {conversation_id} is closed in database - expired")
+            return True
+        
+        _set_conversation_expiration_in_redis(conversation_id, logger)
+        logger.info(f"Conversation {conversation_id} is active, set Redis expiration key")
+        return False
+        
+    except Exception as e:
+        logger.error(f"Error checking conversation expiration for {conversation_id}: {e}")
+        return False
+
+def _set_conversation_expiration_in_redis(conversation_id: str, logger, ttl_hours: int = 24) -> None:
+    
+    try:
+        redis = get_redis_service()
+        expiration_key = RedisHelper.redis_conversation_expired_key(conversation_id)
+        
+        ttl_seconds = ttl_hours * 3600
+        
+        redis.set(expiration_key, "active", ex=ttl_seconds)
+        
+        logger.debug(f"Set conversation expiration in Redis for conversation {conversation_id} with TTL {ttl_hours} hours")
+        
+    except Exception as e:
+        logger.error(f"Failed to set conversation expiration in Redis for {conversation_id}: {e}")
+
+def get_conversation_time_remaining(conversation_id: str, logger) -> Optional[int]:
+
+    try:
+        redis = get_redis_service()
+        expiration_key = RedisHelper.redis_conversation_expired_key(conversation_id)
+        
+        ttl = redis.ttl(expiration_key)
+        
+        if ttl > 0:
+            logger.debug(f"Conversation {conversation_id} expires in {ttl} seconds")
+            return ttl
+        elif ttl == -1:
+            logger.warning(f"Conversation {conversation_id} key exists but has no expiration set")
+            return None
+        else:  
+            logger.debug(f"Conversation {conversation_id} has no expiration key (expired or never set)")
+            return None
+            
+    except Exception as e:
+        logger.error(f"Failed to get conversation time remaining for {conversation_id}: {e}")
+        return None
+
+def should_trigger_chatbot(conversation_id: str, logger) -> bool:
+
+    try:
+        chatbot_context_service = get_chatbot_context_service()
+        chatbot_context = chatbot_context_service.get_chatbot_context(conversation_id)
+        
+        if chatbot_context and chatbot_context.get("waiting_for_response"):
+            logger.debug(f"Chatbot context exists and waiting for response for conversation {conversation_id}")
+            return False  
+        
+        logger.debug(f"No conditions met to trigger chatbot for conversation {conversation_id}")
+        return False
+        
+    except Exception as e:
+        logger.error(f"Error determining chatbot trigger for conversation {conversation_id}: {e}")
+        return False
+    
+def get_default_chatbot(client_id, logger):
+    try:
+        with get_db() as session:
+            stmt = text("""
+                SELECT 
+                id, 
+                name, 
+                language, 
+                triggered, 
+                version, 
+                communicate_type, 
+                is_default, 
+                client_id, 
+                created_at, 
+                updated_at
+                FROM chat_bots
+                WHERE client_id = :client_id 
+                AND is_default = true
+            """)
+            
+            result = session.execute(stmt, {"client_id": client_id})
+            row = result.fetchone()
+            
+            if not row:
+                raise ValueError(f"Chatbot not found for client: {client_id}")
+            
+            result_data = {
+                "chatbot_id": row.id,
+                "name": row.name,
+                "description": row.description,
+                "client_id": str(row.client_id),
+            }
+            return result_data
+    except Exception as e:
+        logger.error(f"Error getting default chatbot for client {client_id}: {e}")
+        raise
+    
+def trigger_chatbot_for_conversation(conversation_id: str, message_data: Dict[str, Any], logger) -> bool:
+    
+    try:
+        conversation = _get_conversation(conversation_id, logger)
+        client_id = conversation.get("client_id")
+        
+        if not client_id:
+            logger.error(f"No client_id found for conversation {conversation_id}")
+            return False
+        
+        try:
+            default_chatbot = get_default_chatbot(client_id, logger)
+            chatbot_id = default_chatbot.get("chatbot_id")
+        except ValueError as e:
+            logger.warning(f"No default chatbot found for client {client_id}: {e}")
+            return False
+        
+        business_data = _get_business_data_for_conversation(conversation_id, message_data, logger)
+        business_data["chatbot_id"] = chatbot_id
+        
+        _mark_conversation_chatbot_triggered(conversation_id, chatbot_id, logger)
+        
+        flow_payload = {
+            "business_token":  business_data["business_token"],
+            "business_phone_number_id": business_data["business_phone_number_id"],
+            "recipient_number": business_data["recipient_number"],
+            "chatbot_id": chatbot_id,
+            "contact_id": business_data["contact_id"]
+        }
+        
+        handle_flow_node_task.delay(flow_payload)
+        logger.info(f"Successfully triggered chatbot {chatbot_id} for conversation {conversation_id}")
+        
+        return 
+    except Exception as e:
+        logger.error(f"Failed to trigger chatbot for conversation {conversation_id}: {e}")
+        return 
+
 
 def _extract_text_content(message_data: Dict[str, Any]) -> str:
     content = message_data.get("content", {})
@@ -135,6 +340,20 @@ def _handle_text_response_to_chatbot(message_data: Dict[str, Any], conversation_
         logger.error(f"Error handling text response to chatbot for conversation {conversation_id}: {e}")
         raise
 
+def check_conversation_expiration(conversation_id, logger):
+    try:
+        redis = get_redis_service()
+        if redis.exists(RedisHelper.redis_conversation_expired_key(conversation_id)):
+            return True
+        else:
+            conversation = _get_conversation(conversation_id, logger)
+            if conversation["is_open"]:
+                return True
+            else:
+                return False
+    except Exception as e:
+        logger.error(f"Error getting business data for conversation {conversation_id}: {e}")
+        raise
 
 @celery_app.task(
     name="my_celery.tasks.process_received_message_task",
@@ -145,23 +364,34 @@ def _handle_text_response_to_chatbot(message_data: Dict[str, Any], conversation_
     default_retry_delay=RETRY_COUNTDOWN,
     acks_late=False
 )
-def process_received_message_task(self, message_body: dict[str, Any],conversation_id: str = None):
+def process_received_message_task(self, message_body: dict[str, Any],conversation_id: str = None,recipient_number: str = None):
     try:
-        message_type = message_body.get("type", "")
         
+        message_type = message_body.get("type", "")
         self.logger.info(f"Processing message type: {message_type} for conversation: {conversation_id}")
         
-        if message_type == "text":
-            processed = _handle_text_response_to_chatbot(message_body, conversation_id,self.logger)
-            
-        else:
-            self.logger.debug(f"Message type {message_type} doesn't require chatbot processing")
+        is_conversation_expired = check_conversation_expiration(conversation_id=conversation_id, logger=self.logger)
         
+        if is_conversation_expired:
+            self.logger.info(f"Conversation {conversation_id} has expired, triggering chatbot for new interaction")
+            
+            trigger_chatbot_for_conversation(conversation_id, message_body, self.logger)
+            
+            return {
+                "status": "success",
+                "conversation_id": conversation_id,
+                "message": "Chatbot triggered for new interaction",
+                "is_conversation_expired": is_conversation_expired
+            }
+        
+        if message_type == "text":
+                processed = _handle_text_response_to_chatbot(message_body, conversation_id, self.logger)
+                self.logger.info(f"Handled text response to existing chatbot: {processed}")
         return {
             "status": "success",
             "conversation_id": conversation_id,
-            "message_type": message_type,
-            "processed": processed
+            "is_conversation_expired": is_conversation_expired,
+            "message": "Message processed successfully"
         }
     except Exception as exc:
         self.logger.error(f"Failed to process received message for conversation {conversation_id}: {exc}", exc_info=True)

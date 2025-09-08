@@ -1,4 +1,5 @@
-from fastapi import APIRouter, Depends
+from typing import Optional
+from fastapi import APIRouter, Depends, Query
 from dependency_injector.wiring import Provide, inject
 from app.core.config.container import Container
 from app.core.exceptions.GlobalException import GlobalException
@@ -33,13 +34,15 @@ async def create_conversation(
 @inject
 async def get_conversations(
                                 token: str = Depends(get_current_user),
-                                page: int = 1,
-                                limit: int = 10,
-                                search_terms: str = None,
+                                page: int = Query(1, ge=1, description="Page number"),
+                                limit: int = Query(10, ge=1, le=100, description="Items per page"),
+                                search_terms: Optional[str] = Query(None, description="Search term for filtering"),
+                                sort_by: Optional[str] = Query(None, description="Sort by: 'status' or default (latest_message)"),
+                                status_filter: Optional[str] = Query(None, description="Filter by status: 'open', 'pending', 'solved', 'broadcast', 'expired'"),
                                 get_conversations: GetUserConversations = Depends(Provide[Container.get_conversations]),
                                 ):
         try:
-                result = await get_conversations.excute(token["userId"], page, limit, search_terms)
+                result = await get_conversations.excute(token["userId"], page, limit, search_terms, sort_by, status_filter)
                 return result
         except GlobalException as e:
                 raise e

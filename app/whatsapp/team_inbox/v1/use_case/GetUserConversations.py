@@ -31,12 +31,12 @@ class GetUserConversations:
         self.redis = redis
     
     
-    async def excute(self, user_id: str, page: int = 1, limit: int = 10, search_term: Optional[str] = None)-> PageableResponse[Conversation]:
+    async def excute(self, user_id: str, page: int = 1, limit: int = 10, search_term: Optional[str] = None, sort_by: Optional[str] = None, status_filter: Optional[str] = None)-> PageableResponse[Conversation]:
         user = await self.user_service.get(user_id)
         if not user:
             raise EntityNotFoundException("User not found")
         
-        conversations : Conversation = await self.conversation_service.get_user_conversations(user_id, page, limit, search_term)
+        conversations : Conversation = await self.conversation_service.get_user_conversations(user_id, page, limit, search_term, sort_by, status_filter)
         logger.info(conversations)
         conversations_data = []        
         for conversation in conversations['data']:
@@ -78,6 +78,7 @@ class GetUserConversations:
                 contact_id=contact.id,
                 contact_name=contact.name,
                 contact_phone_number=contact.phone_number,
+                chatbot_triggered=conversation.chatbot_triggered,
                 country_code_phone_number=contact.country_code,
                 last_message=lastmessage_redis_data['last_message'] if lastmessage_redis_data else None,
                 last_message_time=str(lastmessage_redis_data['last_message_time']) if lastmessage_redis_data else None,
@@ -113,5 +114,3 @@ class GetUserConversations:
         except (ValueError, TypeError) as e:
             logger.error(f"Error converting unread_count '{unread_count_raw}' to int: {e}")
             return 0
-        
-#TODO think about the last message and how much ttl need to be in redis
