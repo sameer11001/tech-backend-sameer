@@ -332,3 +332,38 @@ class ChatbotContextService:
         except Exception as e:
             self.logger.error(f"Error extending context TTL: {e}")
             return False
+        
+# Add this method to your my_celery/services/ChatbotContextService.py
+
+    def set_test_flow(self, test_flow_data: str) -> bool:
+        try:
+            key = f"test_flow:{test_flow_data}"
+            value = {
+                "test_data": test_flow_data,
+                "created_at": DateTimeHelper.now_utc(),
+                "status": "active"
+            }
+            
+            result = self.redis_client.set(key=key, value=value, ttl=300)  # 5 minute TTL
+            
+            self.logger.info(f"Set test flow data: {test_flow_data}")
+            return result
+            
+        except Exception as e:
+            self.logger.error(f"Error setting test flow data: {e}")
+            return False
+    
+    def get_test_flow(self, test_flow_data: str) -> Optional[Dict[str, Any]]:
+        """Get test flow data from Redis"""
+        try:
+            key = f"test_flow:{test_flow_data}"
+            data = self.redis_client.get(key)
+            
+            if data:
+                self.logger.debug(f"Retrieved test flow data: {test_flow_data}")
+            
+            return data
+            
+        except Exception as e:
+            self.logger.error(f"Error getting test flow data: {e}")
+            return None

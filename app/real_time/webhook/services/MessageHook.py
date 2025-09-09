@@ -543,6 +543,7 @@ class MessageHook:
             client_id=str(client.id),
             status=conversation_created.status,
             is_open=conversation_created.is_open,
+            chatbot_triggered=conversation_created.chatbot_triggered,
             contact_name=contact.name,
             contact_phone_number=contact.phone_number,
             country_code_phone_number=contact.country_code,
@@ -553,13 +554,17 @@ class MessageHook:
             last_message_time=datetime.now(timezone.utc).isoformat()
         )
         conversation_data = json.loads(conversation_body.model_dump_json())
-        await self.socket_message.emit_create_new_conversation(conversation_data, business_profile_id)
+        await self.socket_message.emit_create_new_conversation(conversation_data, str(business_profile.id))
         
         await self.chatbot_trigger_publisher.trigger_chatbot_event({
-            "conversation_id": str(conversation_created.id)
+            "conversation_id": str(conversation_created.id),
+            "chatbot_id": str(default_chatbot.id),
+            "business_token": business_profile.access_token,
+            "business_phone_number_id": business_profile.phone_number_id,
+            "recipient_number": f"+{from_number}"
         })
         await logger.adebug("Created new conversation and triggered chatbot", conversation_id=str(conversation_created.id))
-        await self.socket_message.emit_chatbot_triggered_status(conversation_id=str(conversation_created.id), business_profile_id=business_profile_id, chatbot_triggered=True)
+        await self.socket_message.emit_chatbot_triggered_status(conversation_id=str(conversation_created.id), business_profile_id=str(business_profile.id), chatbot_triggered=True)
         return conversation_created
 
     async def _set_conversation_expiration(self, conversation_id: Any, logger) -> None:

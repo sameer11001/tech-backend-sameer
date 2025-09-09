@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Depends, Request
+from fastapi import APIRouter, Depends, Request, Response
 from dependency_injector.wiring import Provide, inject
 from app.core.exceptions.custom_exceptions.InvalidCredentialsException import InvalidCredentialsException
 from app.core.exceptions.custom_exceptions.TokenValidityException import TokenValidityException
@@ -104,10 +104,11 @@ async def refresh(
 @inject
 async def logout(
     request: Request,
+    response: Response,
     user_logout: UserLogout = Depends(Provide[Container.auth_user_logout]),
 ):
     try:
-        return ApiResponse.success_response(data=await user_logout.execute(request))
+        return ApiResponse.success_response(data= await user_logout.execute(request = request, response=response))
     except GlobalException as e:
         raise e
     except Exception as e:

@@ -217,7 +217,6 @@ def get_default_chatbot(client_id, logger):
             result_data = {
                 "chatbot_id": row.id,
                 "name": row.name,
-                "description": row.description,
                 "client_id": str(row.client_id),
             }
             return result_data
@@ -251,6 +250,7 @@ def trigger_chatbot_for_conversation(conversation_id: str, message_data: Dict[st
             "business_token":  business_data["business_token"],
             "business_phone_number_id": business_data["business_phone_number_id"],
             "recipient_number": business_data["recipient_number"],
+            "conversation_id": conversation_id,
             "chatbot_id": chatbot_id,
             "contact_id": business_data["contact_id"]
         }

@@ -26,12 +26,13 @@ celery_app.conf.update(
     task_eager_propagates=False,
     task_store_eager_result=False,
     
-    worker_concurrency=4,
+    worker_concurrency=1,
     worker_disable_rate_limits=True,
-    worker_max_tasks_per_child=300,
+    worker_max_tasks_per_child=10,
     worker_prefetch_multiplier=1,
     worker_hijack_root_logger=False,
     worker_redirect_stdouts=True,
+    worker_max_memory_per_child=256000,
     
     broker_connection_max_retries=10,
     broker_pool_limit=10,

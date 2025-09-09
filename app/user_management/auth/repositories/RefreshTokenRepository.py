@@ -21,6 +21,15 @@ class RefreshTokenRepository(BaseRepository[RefreshToken]):
             except SQLAlchemyError as e:
                 raise DataBaseException(str(e))
 
+    async def get_by_user_id(self, user_id: str) -> Optional[RefreshToken]:
+        async with self.session as db_session:
+            try:
+                statement = select(RefreshToken).where(RefreshToken.user_id == user_id)
+                result = await db_session.exec(statement)
+                return result.all()
+            except SQLAlchemyError as e:
+                raise DataBaseException(str(e))
+
     async def delete_by_user_id(self, user_id: str, commit: bool = True) -> None:
         async with self.session as db_session:
             try:

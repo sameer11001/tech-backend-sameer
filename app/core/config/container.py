@@ -218,10 +218,10 @@ class Container(containers.DeclarativeContainer):
     
     #----- AUTH USE CASES -----
     auth_user_login = providers.Factory(UserLogin, user_service = user_service, refresh_token_service = refresh_token_service, client_service = client_service, business_profile_service = business_profile_service)
-    auth_user_logout = providers.Factory(UserLogout, refresh_token_service = refresh_token_service)
+    auth_user_logout = providers.Factory(UserLogout, refresh_token_service = refresh_token_service, redis_service = async_redis_service)
     auth_token_refresh = providers.Factory(TokenRefresh, refresh_token_service = refresh_token_service, user_service = user_service, business_profile_service = business_profile_service, redis_service = async_redis_service)
     auth_get_roles = providers.Factory(GetRoles, role_service = role_service, redis_service = async_redis_service)
-    auth_force_logout_by_admin = providers.Factory(ForceLogoutByAdmin, user_service = user_service , refresh_token_service = refresh_token_service)
+    auth_force_logout_by_admin = providers.Factory(ForceLogoutByAdmin, user_service = user_service , refresh_token_service = refresh_token_service, redis_service = async_redis_service)
     auth_force_password_reset_by_admin = providers.Factory(ForcePasswordResetByAdmin, user_service = user_service)
     
     #----- BUSINESS PROFILE USE CASES -----

@@ -22,6 +22,14 @@ class RefreshTokenService(BaseService[RefreshToken]):
         if not should_exist and result:
             raise ConflictException()
         return result
+    
+    async def get_by_user_id(self, user_id: str, should_exist: bool = True):
+        result = await self.repository.get_by_user_id(user_id)
+        if should_exist and not result:
+            raise EntityNotFoundException()
+        if not should_exist and result:
+            raise ConflictException()
+        return result
 
     async def delete_by_user_id(self, user_id: str):
         return await self.repository.delete_by_user_id(user_id)

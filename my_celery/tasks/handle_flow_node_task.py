@@ -197,11 +197,11 @@ def handle_flow_node_task(self, data):
     try:
         chatbot_context_service = get_chatbot_context_service()
         
-        conversation_id = data["conversation_id"]
-        current_node_id = data["current_node_id"]
+        conversation_id = data.get("conversation_id")
+        current_node_id = data.get("current_node_id")
         button_id = data.get("button_id")
         user_response = data.get("user_response")
-        business_data = data["business_data"]
+        business_data = data.get("business_data")
         
         self.logger.info(f"Processing flow node task: conversation={conversation_id},"
                     f"current_node={current_node_id}, button_id={button_id}, "
