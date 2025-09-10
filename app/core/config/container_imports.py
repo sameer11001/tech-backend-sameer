@@ -24,6 +24,7 @@ from app.annotations.v1.use_case.DeleteTag import DeleteTag
 from app.annotations.v1.use_case.GetTags import GetTags
 from app.annotations.v1.use_case.UpdateAttributeByContact import UpdateAttributeByContact
 from app.annotations.v1.use_case.UpdateContacts import UpdateContact
+from app.annotations.v1.use_case.BulkUploadContacts import BulkUploadContacts
 from app.annotations.v1.use_case.UpdateNote import UpdateNote
 from app.annotations.v1.use_case.UpdateTag import UpdateTag
 from app.chat_bot.models.ChatBot import FlowNode

@@ -1,9 +1,10 @@
 from typing import Optional
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, File, UploadFile
 from dependency_injector.wiring import Provide, inject
 
 from app.annotations.v1.schemas.request.CreateContactRequest import CreateContactRequest
 from app.annotations.v1.schemas.request.UpdateContactRequest import UpdateContactsRequest
+from app.annotations.v1.use_case.BulkUploadContacts import BulkUploadContacts
 from app.annotations.v1.use_case.CreateContact import CreateContact
 from app.annotations.v1.use_case.DeleteContact import DeleteContact
 from app.annotations.v1.use_case.GetContacts import GetContacts
@@ -69,6 +70,22 @@ async def delete_contact(contact_id: str,
     try:
         return ApiResponse.success_response(data = await delete_contact.execute(token["userId"], 
                                             contact_id))
+    except GlobalException as e:
+        raise e
+    except Exception as e:
+        raise e
+    
+@router.post("/bulk-upload")
+@inject
+async def bulk_upload_contacts(
+    file: UploadFile = File(..., description="Excel or CSV file containing contact data"),
+    bulk_upload_contacts: BulkUploadContacts = Depends(Provide[Container.contact_bulk_upload_contacts]),
+    token: dict = Depends(get_current_user)
+):
+
+    try:
+        result = await bulk_upload_contacts.execute(token["userId"], file)
+        return ApiResponse.success_response(data=result)
     except GlobalException as e:
         raise e
     except Exception as e:

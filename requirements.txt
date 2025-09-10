@@ -34,3 +34,5 @@ uuid6== 2025.0.0
 orjson== 3.10.18
 faststream[rabbit]== 0.5.48
 gunicorn==23.0.0
+pandas==2.1.4
+openpyxl==3.1.2

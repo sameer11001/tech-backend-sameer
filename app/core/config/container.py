@@ -285,6 +285,9 @@ class Container(containers.DeclarativeContainer):
     contact_delete_contact = providers.Factory(DeleteContact, user_service = user_service, contact_service = contact_service)
     contact_get_contacts = providers.Factory(GetContacts, contact_service = contact_service, user_service = user_service)
     contact_update_contact = providers.Factory(UpdateContact, contact_service = contact_service, user_service = user_service, attribute_service = attribute_service, tag_service = tag_service)
+    contact_bulk_upload_contacts = providers.Factory(BulkUploadContacts, contact_service = contact_service, user_service = user_service)
+
+
     
     #----- BroadCast -----
     broadcast_get_broadcasts = providers.Factory(GetBroadcasts, broadcast_service = broadcast_service, business_profile_service = business_profile_service)

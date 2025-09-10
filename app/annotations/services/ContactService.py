@@ -40,3 +40,6 @@ class ContactService(BaseService[Contact]):
 
     async def updateContactTags(self, contact_id: str, tags: list[ContactTagLink]):
         return await self.repository.updateContactTags(contact_id, tags)
+    
+    async def bulk_create(self, contacts: List[Contact]) -> List[Contact]:
+        return await self.repository.bulk_create(contacts)

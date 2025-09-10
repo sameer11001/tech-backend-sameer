@@ -4,7 +4,7 @@ from my_celery.config.celery_config import CELERY_TASK
 from my_celery.config.settings import settings
 
 celery_app : Celery = Celery(
-    "worker",
+    "celery_worker",
     broker=settings.RABBITMQ_URI,
     include=CELERY_TASK
 )

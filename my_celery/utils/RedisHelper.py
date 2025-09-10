@@ -109,7 +109,7 @@ class RedisHelper:
     
     @staticmethod
     def redis_chatbot_context_key(conversation_id: str) -> str:
-        return f"chatbot_context:conversation:{conversation_id}"
+        return f"chatbot:conversation:{conversation_id}"
     
     @staticmethod
     def redis_chatbot_button_key(chatbot_id: str, current_node_id: str, btn_id: str) -> str:

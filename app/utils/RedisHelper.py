@@ -105,13 +105,25 @@ class RedisHelper:
     
     @staticmethod
     def redis_chatbot_context_key(conversation_id: str) -> str:
-        return f"chatbot_context:conversation:{conversation_id}"
+        return f"chatbot:conversation:{conversation_id}"
     
     @staticmethod
     def redis_chatbot_button_key(chatbot_id: str, current_node_id: str, btn_id: str) -> str:
-        return  f"chatbot:{chatbot_id}:node:{current_node_id}:buttons:{btn_id}"
+        return f"chatbot:{chatbot_id}:node:{current_node_id}:buttons:{btn_id}"
     
     @staticmethod
     def redis_chatbot_contact_data_key(conversation_id: str) -> str:
         return f"chatbot:contact_data:conversation:{conversation_id}"
+    
+    @staticmethod
+    def redis_business_data_by_conversation_key(conversation_id: str) -> str:
+        return f"chatbot:business_data:conversation:{conversation_id}"
+    
+    @staticmethod
+    def redis_chatbot_flow_state_key(conversation_id: str) -> str:
+        return f"chatbot:flow_state:conversation:{conversation_id}"
+    
+    @staticmethod
+    def redis_chatbot_node_transitions_key(chatbot_id: str, node_id: str) -> str:
+        return f"chatbot:{chatbot_id}:node:{node_id}:transitions"
     

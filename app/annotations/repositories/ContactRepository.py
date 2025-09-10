@@ -11,9 +11,10 @@ from app.annotations.models.ContactAttributeLink import ContactAttributeLink
 from app.annotations.models.ContactTagLink import ContactTagLink
 from app.utils.enums.SortBy import SortByCreatedAt
 from app.whatsapp.business_profile.v1.models.BusinessProfile import BusinessProfile
+from sqlmodel.ext.asyncio.session import AsyncSession
 
 class ContactRepository(BaseRepository[Contact]):
-    def __init__(self, session):
+    def __init__(self, session : AsyncSession):
         self.session = session
         
         super().__init__(Contact, session)
@@ -104,4 +105,16 @@ class ContactRepository(BaseRepository[Contact]):
                 result = await db_session.exec(query)
                 return result.first()
             except SQLAlchemyError as e:
+                raise DataBaseException(str(e))
+
+    async def bulk_create(self, contacts: List[Contact]) -> List[Contact]:
+  
+        async with self.session as db_session:
+            try:
+                db_session.add_all(contacts)
+                await db_session.flush()
+                await db_session.commit()
+                return contacts
+            except SQLAlchemyError as e:
+                await db_session.rollback()
                 raise DataBaseException(str(e))
