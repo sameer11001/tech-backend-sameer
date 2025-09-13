@@ -107,7 +107,7 @@ class ContactRepository(BaseRepository[Contact]):
             except SQLAlchemyError as e:
                 raise DataBaseException(str(e))
 
-    async def bulk_create(self, contacts: List[Contact]) -> List[Contact]:
+    async def bulk_create_contacts(self, contacts: List[Contact]) -> List[Contact]:
   
         async with self.session as db_session:
             try:

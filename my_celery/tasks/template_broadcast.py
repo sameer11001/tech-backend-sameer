@@ -31,12 +31,13 @@ def template_broadcast(self, data):
 
     business_number = data.get("business_number")
     user_id = data.get("user_id")
-    content = data.get("content")
     business_token = data.get("business_token")
     business_number_id = data.get("business_number_id")
-    phone_to = content.get("to") if content else None
+    phone_to = whatapp_template_content.get("to") if whatapp_template_content else None
+    original_template_body = data.get("original_template_body")
+    whatapp_template_content = data.get("whatsapp_message_body")
 
-    if not all([business_number, user_id, content, business_token, business_number_id, phone_to]):
+    if not all([business_number, user_id, whatapp_template_content, business_token, business_number_id, phone_to]):
         self.logger.error("invalid_input_data", data=data)
         return {"error": "Invalid input"}
 
@@ -44,7 +45,7 @@ def template_broadcast(self, data):
         response_template = send_template_message(
             accessToken=business_token,
             phone_number_id=business_number_id,
-            payload=content
+            payload=whatapp_template_content
         )
     except Exception as e:
         return self.retry_task(exc=e)
@@ -97,7 +98,7 @@ def template_broadcast(self, data):
             message_status="sent",
             conversation_id=conversation_id,
             wa_message_id=wa_message_id,
-            content=content,
+            content=original_template_body,
             is_from_contact=False,
             member_id=user_id,
             created_at=DateTimeHelper.now_utc(),

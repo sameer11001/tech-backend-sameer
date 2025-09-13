@@ -1,5 +1,5 @@
 import phonenumbers
-from typing import List, Dict, Any
+from typing import Dict, Any
 from fastapi import UploadFile
 
 from app.annotations.models.Contact import Contact
@@ -9,11 +9,9 @@ from app.user_management.user.models.Client import Client
 from app.user_management.user.models.User import User
 from app.user_management.user.services.UserService import UserService
 from app.utils.FileProcessor import FileProcessor
-from app.core.exceptions.custom_exceptions.BadRequestException import BadRequestException
 import logging
 
 logger = logging.getLogger(__name__)
-
 
 class BulkUploadContacts:
     def __init__(self, contact_service: ContactService, user_service: UserService):
@@ -37,6 +35,9 @@ class BulkUploadContacts:
         ]
         
         successful_uploads = 0
+        successful_phone_numbers = []
+        already_exist_numbers = []
+        invalid_format_numbers = []
         contacts_to_create = []
         
         for record in valid_records:
@@ -44,17 +45,37 @@ class BulkUploadContacts:
                 contact = await self._create_contact_from_record(record, client.id)
                 contacts_to_create.append(contact)
             except Exception as e:
-                logger.error(f"Error creating contact from record: {str(e)}")
-                errors.append(ContactError(
-                    row=record.get('row', 0),
-                    error=f"Error creating contact: {str(e)}",
-                    data=record
-                ))
-        
+                
+                error_message = str(e)
+                logger.error(f"Error in contact creation: {error_message}")
+                
+                try:
+                    full_phone_number = record['country_code'] + record['phone_number']
+                    parsed_number = phonenumbers.parse(full_phone_number, None)
+                    formatted_number = f"+{parsed_number.country_code}{parsed_number.national_number}"
+                except:
+                    formatted_number = record.get('country_code', '') + record.get('phone_number', '')
+                
+                if "already exists" in error_message:
+                    already_exist_numbers.append(formatted_number)
+                elif "Invalid phone number" in error_message:
+                    invalid_format_numbers.append(formatted_number)
+                else:
+                    errors.append(ContactError(
+                        row=record['row'],
+                        error=error_message,
+                        data=record
+                    ))
         if contacts_to_create:
             try:
                 created_contacts = await self.contact_service.bulk_create_contacts(contacts_to_create)
                 successful_uploads = len(created_contacts)
+                
+                successful_phone_numbers = [
+                    f"{contact.country_code}{contact.phone_number}" 
+                    for contact in created_contacts
+                ]
+                
             except Exception as e:
                 logger.error(f"Error in bulk contact creation: {str(e)}")
                 for contact in contacts_to_create:
@@ -71,12 +92,18 @@ class BulkUploadContacts:
         if successful_uploads == total_processed:
             message = f"Successfully uploaded all {successful_uploads} contacts"
         elif successful_uploads > 0:
-            message = f"Uploaded {successful_uploads} contacts successfully, {failed_uploads} failed"
+            if already_exist_numbers > 0:
+                message = f"Successfully uploaded {successful_uploads} contacts. already exist {already_exist_numbers} from {total_processed}"
+            else:
+                message = f"Successfully uploaded {successful_uploads} contacts from {total_processed}"
         else:
-            message = f"Failed to upload any contacts. {failed_uploads} errors occurred"
+            message = f"Failed to upload any contacts. {failed_uploads}"
         
         return BulkUploadContactsResponse(
             total_processed=total_processed,
+            list_phone_numbers=successful_phone_numbers,
+            already_exist_numbers=already_exist_numbers,
+            invalid_format_numbers=invalid_format_numbers,
             successful_uploads=successful_uploads,
             failed_uploads=failed_uploads,
             errors=errors,
@@ -96,7 +123,7 @@ class BulkUploadContacts:
             national_number = str(parsed_number.national_number)
             
             existing_contact = await self.contact_service.get_by_client_id_phone_number(
-                client_id, national_number, should_exist=False
+                client_id, country_code + national_number, should_exist=False
             )
             
             if existing_contact:

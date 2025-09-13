@@ -2,7 +2,7 @@ from datetime import datetime, timezone
 from uuid import UUID
 from app.annotations.services.ContactService import ContactService
 
-from app.events.pub.MessageBroadcastPublisher import MessageBroadcastPublisher
+from app.events.pub.TemplateMessageBroadcastPublisher import TemplateMessageBroadcastPublisher
 from app.core.logs.logger import get_logger
 from app.core.repository.MongoRepository import MongoCRUD
 from app.core.storage.redis import AsyncRedisService
@@ -27,7 +27,7 @@ class BroadcastScheduler:
                 contact_service: ContactService,
                 bussiness_service: BusinessProfileService,
                 redis:AsyncRedisService,
-                message_publisher: MessageBroadcastPublisher,
+                message_publisher: TemplateMessageBroadcastPublisher,
                 mongo_crud_template: MongoCRUD[Template]
                 ):
         self.broadcast_service = broadcast_service
@@ -148,7 +148,8 @@ class BroadcastScheduler:
             logger.info(f"Broadcast contacts:")
             
             broadcast_payload = BroadCastTemplate(
-                template_body=template_object,
+                whatsapp_template_body=template_object,
+                original_template_body=template_body,
                 list_of_numbers=contact_numbers
             )
             

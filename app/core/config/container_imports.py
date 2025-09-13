@@ -45,7 +45,7 @@ from app.core.services.HTTPClient import EnhancedHTTPClient
 from app.events.pub.ChatBotTriggerPublisher import ChatBotTriggerPublisher
 from app.events.pub.ChatbotFlowPublisher import ChatbotFlowPublisher
 from app.chat_bot.v1.use_case.MakeChatBotDefault import MakeChatBotDefault
-from app.events.pub.MessageBroadcastPublisher import MessageBroadcastPublisher
+from app.events.pub.TemplateMessageBroadcastPublisher import TemplateMessageBroadcastPublisher
 from app.core.broker.RabbitMQBroker import RabbitMQBroker,RabbitMQSettings
 from app.events.pub.MessageReceivedPublisher import MessageHookReceivedPublisher
 from app.events.pub.SystemLogsPublisher import SystemLogsPublisher

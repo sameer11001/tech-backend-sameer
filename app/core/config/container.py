@@ -139,7 +139,7 @@ class Container(containers.DeclarativeContainer):
     
     #----- pub/sub -----
     message_publisher = providers.Singleton(WhatsappMessagePublisher, connection=rabbitmq_connection)
-    message_broadcast_publisher = providers.Singleton(MessageBroadcastPublisher, connection=rabbitmq_connection)
+    message_broadcast_publisher = providers.Singleton(TemplateMessageBroadcastPublisher, connection=rabbitmq_connection)
     chat_bot_trigger_publisher = providers.Singleton(ChatBotTriggerPublisher, connection=rabbitmq_connection)
     chat_bot_flow_publisher = providers.Singleton(ChatbotFlowPublisher, connection=rabbitmq_connection)
     message_hook_received_publisher = providers.Singleton(MessageHookReceivedPublisher, connection=rabbitmq_connection)

@@ -142,4 +142,5 @@ class TemplateObject(BaseModel):
 
 class BroadCastTemplate(BaseModel):
     list_of_numbers: List[str]
-    template_body: TemplateObject
+    whatsapp_template_body: TemplateObject
+    original_template_body: dict

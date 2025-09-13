@@ -68,15 +68,15 @@ class TemplateMessage:
 
         template_body = template_body.model_dump(exclude_none=True)
         
-        template_object = TemplateBuilder.build_template_object(template_body, parameters)
+        template_builder_object = TemplateBuilder.build_template_object(template_body, parameters)
         
-        template_dict = template_object.model_dump(exclude_none=True)  
+        template_whatsapp_dict = template_builder_object.model_dump(exclude_none=True)  
 
         request_model = SendTemplateRequest(
             messaging_product="whatsapp",
             to=recipient_number,
             type="template",
-            template=template_dict,
+            template=template_whatsapp_dict,
         )
         
         response_body = await self.whatsapp_message_api.send_template_message(

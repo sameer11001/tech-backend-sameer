@@ -13,7 +13,7 @@ class BusinessProfile(BaseEntity, table=True):
     app_id: str = Field(nullable=False, unique=True)
     phone_number: str = Field(nullable=False, unique=True)
     phone_number_id: str = Field(nullable=False, unique=True)
-    whatsapp_business_account_id: str = Field(nullable=False, unique=True)
+    whatsapp_business_account_id: str = Field(nullable=False, unique=True) 
     access_token: str = Field(nullable=False)
 
     # relationship

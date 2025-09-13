@@ -1,6 +1,6 @@
 from typing import Annotated, List, Literal, Optional, Union
 from uuid import UUID
-from pydantic import AfterValidator, AwareDatetime, BaseModel, Field
+from pydantic import AfterValidator, AwareDatetime, BaseModel, Field, field_validator
 from app.utils.validators.validate_phone_number import validate_phone_list
 from app.utils.validators.validate_time_utc import validate_utc
 
@@ -143,7 +143,7 @@ class TemplateObject(BaseModel):
     )
 
 def optional_validate_utc(dt: Optional[AwareDatetime]) -> Optional[AwareDatetime]:
-    if dt is None:
+    if dt is None or dt is "":
         return None
     return validate_utc(dt)
 
@@ -154,3 +154,9 @@ class SchedualBroadCastRequest(BaseModel):
     parameters: Optional[List[str]] = Field(None, description="Template parameter values")
     scheduled_time:  Optional[Annotated[AwareDatetime, AfterValidator(optional_validate_utc)]]
     is_now: Optional[bool] = Field(None, description="Send immediately if True")
+
+    @field_validator("scheduled_time", mode="before")
+    def empty_string_to_none(cls, v):
+        if v == "" or v is None:
+            return None
+        return v
